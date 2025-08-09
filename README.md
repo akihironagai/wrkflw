@@ -14,12 +14,12 @@ WRKFLW is a powerful command-line tool for validating and executing GitHub Actio
 
 - **TUI Interface**: A full-featured terminal user interface for managing and monitoring workflow executions
 - **Validate Workflow Files**: Check for syntax errors and common mistakes in GitHub Actions workflow files with proper exit codes for CI/CD integration
-- **Execute Workflows Locally**: Run workflows directly on your machine using Docker containers
-- **Emulation Mode**: Optional execution without Docker by emulating the container environment locally
+- **Execute Workflows Locally**: Run workflows directly on your machine using Docker or Podman containers
+- **Multiple Container Runtimes**: Support for Docker, Podman, and emulation mode for maximum flexibility
 - **Job Dependency Resolution**: Automatically determines the correct execution order based on job dependencies
-- **Docker Integration**: Execute workflow steps in isolated Docker containers with proper environment setup
+- **Container Integration**: Execute workflow steps in isolated containers with proper environment setup
 - **GitHub Context**: Provides GitHub-like environment variables and workflow commands
-- **Multiple Runtime Modes**: Choose between Docker containers or local emulation for maximum flexibility
+- **Rootless Execution**: Podman support enables running containers without root privileges
 - **Action Support**: Supports various GitHub Actions types:
   - Docker container actions
   - JavaScript actions
@@ -29,6 +29,41 @@ WRKFLW is a powerful command-line tool for validating and executing GitHub Actio
 - **Output Capturing**: View logs, step outputs, and execution details
 - **Parallel Job Execution**: Runs independent jobs in parallel for faster workflow execution
 - **Trigger Workflows Remotely**: Manually trigger workflow runs on GitHub or GitLab
+
+## Requirements
+
+### Container Runtime (Optional)
+
+WRKFLW supports multiple container runtimes for isolated execution:
+
+- **Docker**: The default container runtime. Install from [docker.com](https://docker.com)
+- **Podman**: A rootless container runtime. Perfect for environments where Docker isn't available or permitted. Install from [podman.io](https://podman.io)
+- **Emulation**: No container runtime required. Executes commands directly on the host system
+
+### Podman Support
+
+Podman is particularly useful in environments where:
+- Docker installation is not permitted by your organization
+- Root privileges are not available for Docker daemon
+- You prefer rootless container execution
+- Enhanced security through daemonless architecture is desired
+
+To use Podman:
+```bash
+# Install Podman (varies by OS)
+# On macOS with Homebrew:
+brew install podman
+
+# On Ubuntu/Debian:
+sudo apt-get install podman
+
+# Initialize Podman machine (macOS/Windows)
+podman machine init
+podman machine start
+
+# Use with wrkflw
+wrkflw run --runtime podman .github/workflows/ci.yml
+```
 
 ## Installation
 
@@ -115,8 +150,11 @@ fi
 # Run a workflow with Docker (default)
 wrkflw run .github/workflows/ci.yml
 
-# Run a workflow in emulation mode (without Docker)
-wrkflw run --emulate .github/workflows/ci.yml
+# Run a workflow with Podman instead of Docker
+wrkflw run --runtime podman .github/workflows/ci.yml
+
+# Run a workflow in emulation mode (without containers)
+wrkflw run --runtime emulation .github/workflows/ci.yml
 
 # Run with verbose output
 wrkflw run --verbose .github/workflows/ci.yml
@@ -137,8 +175,11 @@ wrkflw tui path/to/workflows
 # Open TUI with a specific workflow pre-selected
 wrkflw tui path/to/workflow.yml
 
+# Open TUI with Podman runtime
+wrkflw tui --runtime podman
+
 # Open TUI in emulation mode
-wrkflw tui --emulate
+wrkflw tui --runtime emulation
 ```
 
 ### Triggering Workflows Remotely
@@ -162,7 +203,7 @@ The terminal user interface provides an interactive way to manage workflows:
 - **r**: Run all selected workflows
 - **a**: Select all workflows
 - **n**: Deselect all workflows
-- **e**: Toggle between Docker and Emulation mode
+- **e**: Cycle through runtime modes (Docker → Podman → Emulation)
 - **v**: Toggle between Execution and Validation mode
 - **Esc**: Back / Exit detailed view
 - **q**: Quit application
@@ -225,20 +266,22 @@ $ wrkflw
 # This will automatically load .github/workflows files into the TUI
 ```
 
-## Requirements
+## System Requirements
 
 - Rust 1.67 or later
-- Docker (optional, for container-based execution)
-  - When not using Docker, the emulation mode can run workflows using your local system tools
+- Container Runtime (optional, for container-based execution):
+  - **Docker**: Traditional container runtime
+  - **Podman**: Rootless alternative to Docker  
+  - **None**: Emulation mode runs workflows using local system tools
 
 ## How It Works
 
-WRKFLW parses your GitHub Actions workflow files and executes each job and step in the correct order. For Docker mode, it creates containers that closely match GitHub's runner environments. The workflow execution process:
+WRKFLW parses your GitHub Actions workflow files and executes each job and step in the correct order. For container modes (Docker/Podman), it creates containers that closely match GitHub's runner environments. The workflow execution process:
 
 1. **Parsing**: Reads and validates the workflow YAML structure
 2. **Dependency Resolution**: Creates an execution plan based on job dependencies
 3. **Environment Setup**: Prepares GitHub-like environment variables and context
-4. **Execution**: Runs each job and step either in Docker containers or through local emulation
+4. **Execution**: Runs each job and step either in containers (Docker/Podman) or through local emulation
 5. **Monitoring**: Tracks progress and captures outputs in the TUI or command line
 
 ## Advanced Features
@@ -262,7 +305,7 @@ WRKFLW supports composite actions, which are actions made up of multiple steps. 
 
 ### Container Cleanup
 
-WRKFLW automatically cleans up any Docker containers created during workflow execution, even if the process is interrupted with Ctrl+C.
+WRKFLW automatically cleans up any containers created during workflow execution (Docker/Podman), even if the process is interrupted with Ctrl+C.
 
 For debugging failed workflows, you can preserve containers that fail by using the `--preserve-containers-on-failure` flag:
 
@@ -277,9 +320,45 @@ wrkflw tui --preserve-containers-on-failure
 When a container fails with this flag enabled, WRKFLW will:
 - Keep the failed container running instead of removing it
 - Log the container ID and provide inspection instructions
-- Show a message like: `Preserving container abc123 for debugging (exit code: 1). Use 'docker exec -it abc123 bash' to inspect.`
+- Show a message like: `Preserving container abc123 for debugging (exit code: 1). Use 'docker exec -it abc123 bash' to inspect.` (Docker)
+- Or: `Preserving container abc123 for debugging (exit code: 1). Use 'podman exec -it abc123 bash' to inspect.` (Podman)
 
 This allows you to inspect the exact state of the container when the failure occurred, examine files, check environment variables, and debug issues more effectively.
+
+### Podman-Specific Features
+
+When using Podman as the container runtime, you get additional benefits:
+
+**Rootless Operation:**
+```bash
+# Run workflows without root privileges
+wrkflw run --runtime podman .github/workflows/ci.yml
+```
+
+**Enhanced Security:**
+- Daemonless architecture reduces attack surface
+- User namespaces provide additional isolation
+- No privileged daemon required
+
+**Container Inspection:**
+```bash
+# List preserved containers
+podman ps -a --filter "name=wrkflw-"
+
+# Inspect a preserved container's filesystem (without executing)
+podman mount <container-id>
+
+# Or run a new container with the same volumes
+podman run --rm -it --volumes-from <failed-container> ubuntu:20.04 bash
+
+# Clean up all wrkflw containers
+podman ps -a --filter "name=wrkflw-" --format "{{.Names}}" | xargs podman rm -f
+```
+
+**Compatibility:**
+- Drop-in replacement for Docker workflows
+- Same CLI options and behavior
+- Identical container execution environment
 
 ## Limitations
 
@@ -288,7 +367,7 @@ This allows you to inspect the exact state of the container when the failure occ
 - ✅ Job dependency resolution and parallel execution (all jobs with correct 'needs' relationships are executed in the right order, and independent jobs run in parallel)
 - ✅ Matrix builds (supported for reasonable matrix sizes; very large matrices may be slow or resource-intensive)
 - ✅ Environment variables and GitHub context (all standard GitHub Actions environment variables and context objects are emulated)
-- ✅ Docker container actions (all actions that use Docker containers are supported in Docker mode)
+- ✅ Container actions (all actions that use containers are supported in Docker and Podman modes)
 - ✅ JavaScript actions (all actions that use JavaScript are supported)
 - ✅ Composite actions (all composite actions, including nested and local composite actions, are supported)
 - ✅ Local actions (actions referenced with local paths are supported)
@@ -303,15 +382,15 @@ This allows you to inspect the exact state of the container when the failure occ
 
 ### Limited or Unsupported Features (Explicit List)
 - ❌ GitHub secrets and permissions: Only basic environment variables are supported. GitHub's encrypted secrets and fine-grained permissions are NOT available.
-- ❌ GitHub Actions cache: Caching functionality (e.g., `actions/cache`) is NOT supported in emulation mode and only partially supported in Docker mode (no persistent cache between runs).
+- ❌ GitHub Actions cache: Caching functionality (e.g., `actions/cache`) is NOT supported in emulation mode and only partially supported in Docker and Podman modes (no persistent cache between runs).
 - ❌ GitHub API integrations: Only basic workflow triggering is supported. Features like workflow status reporting, artifact upload/download, and API-based job control are NOT available.
 - ❌ GitHub-specific environment variables: Some advanced or dynamic environment variables (e.g., those set by GitHub runners or by the GitHub API) are emulated with static or best-effort values, but not all are fully functional.
 - ❌ Large/complex matrix builds: Very large matrices (hundreds or thousands of job combinations) may not be practical due to performance and resource limits.
-- ❌ Network-isolated actions: Actions that require strict network isolation or custom network configuration may not work out-of-the-box and may require manual Docker configuration.
+- ❌ Network-isolated actions: Actions that require strict network isolation or custom network configuration may not work out-of-the-box and may require manual container runtime configuration.
 - ❌ Some event triggers: Only `workflow_dispatch` (manual trigger) is fully supported. Other triggers (e.g., `push`, `pull_request`, `schedule`, `release`, etc.) are NOT supported.
 - ❌ GitHub runner-specific features: Features that depend on the exact GitHub-hosted runner environment (e.g., pre-installed tools, runner labels, or hardware) are NOT guaranteed to match. Only a best-effort emulation is provided.
 - ❌ Windows and macOS runners: Only Linux-based runners are fully supported. Windows and macOS jobs are NOT supported.
-- ❌ Service containers: Service containers (e.g., databases defined in `services:`) are only supported in Docker mode. In emulation mode, they are NOT supported.
+- ❌ Service containers: Service containers (e.g., databases defined in `services:`) are only supported in Docker and Podman modes. In emulation mode, they are NOT supported.
 - ❌ Artifacts: Uploading and downloading artifacts between jobs/steps is NOT supported.
 - ❌ Job/step timeouts: Custom timeouts for jobs and steps are NOT enforced.
 - ❌ Job/step concurrency and cancellation: Features like `concurrency` and job cancellation are NOT supported.
@@ -319,6 +398,7 @@ This allows you to inspect the exact state of the container when the failure occ
 
 ### Runtime Mode Differences
 - **Docker Mode**: Provides the closest match to GitHub's environment, including support for Docker container actions, service containers, and Linux-based jobs. Some advanced container configurations may still require manual setup.
+- **Podman Mode**: Similar to Docker mode but uses Podman for container execution. Offers rootless container support and enhanced security. Fully compatible with Docker-based workflows.
 - **Emulation Mode**: Runs workflows using the local system tools. Limitations:
   - Only supports local and JavaScript actions (no Docker container actions)
   - No support for service containers
@@ -373,7 +453,7 @@ The following roadmap outlines our planned approach to implementing currently un
 ### 6. Network-Isolated Actions
 - **Goal:** Support custom network configurations and strict isolation for actions.
 - **Plan:** 
-  - Add advanced Docker network configuration options.
+  - Add advanced container network configuration options for Docker and Podman.
   - Document best practices for network isolation.
 
 ### 7. Event Triggers

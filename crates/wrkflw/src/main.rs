@@ -1,15 +1,35 @@
 use bollard::Docker;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+
+#[derive(Debug, Clone, ValueEnum)]
+enum RuntimeChoice {
+    /// Use Docker containers for isolation
+    Docker,
+    /// Use Podman containers for isolation
+    Podman,
+    /// Use process emulation mode (no containers)
+    Emulation,
+}
+
+impl From<RuntimeChoice> for executor::RuntimeType {
+    fn from(choice: RuntimeChoice) -> Self {
+        match choice {
+            RuntimeChoice::Docker => executor::RuntimeType::Docker,
+            RuntimeChoice::Podman => executor::RuntimeType::Podman,
+            RuntimeChoice::Emulation => executor::RuntimeType::Emulation,
+        }
+    }
+}
 
 #[derive(Debug, Parser)]
 #[command(
     name = "wrkflw",
     about = "GitHub & GitLab CI/CD validator and executor",
     version,
-    long_about = "A CI/CD validator and executor that runs workflows locally.\n\nExamples:\n  wrkflw validate                             # Validate all workflows in .github/workflows\n  wrkflw run .github/workflows/build.yml      # Run a specific workflow\n  wrkflw run .gitlab-ci.yml                   # Run a GitLab CI pipeline\n  wrkflw --verbose run .github/workflows/build.yml  # Run with more output\n  wrkflw --debug run .github/workflows/build.yml    # Run with detailed debug information\n  wrkflw run --emulate .github/workflows/build.yml  # Use emulation mode instead of Docker\n  wrkflw run --preserve-containers-on-failure .github/workflows/build.yml  # Keep failed containers for debugging"
+    long_about = "A CI/CD validator and executor that runs workflows locally.\n\nExamples:\n  wrkflw validate                             # Validate all workflows in .github/workflows\n  wrkflw run .github/workflows/build.yml      # Run a specific workflow\n  wrkflw run .gitlab-ci.yml                   # Run a GitLab CI pipeline\n  wrkflw --verbose run .github/workflows/build.yml  # Run with more output\n  wrkflw --debug run .github/workflows/build.yml    # Run with detailed debug information\n  wrkflw run --runtime emulation .github/workflows/build.yml  # Use emulation mode instead of containers\n  wrkflw run --runtime podman .github/workflows/build.yml     # Use Podman instead of Docker\n  wrkflw run --preserve-containers-on-failure .github/workflows/build.yml  # Keep failed containers for debugging"
 )]
 struct Wrkflw {
     #[command(subcommand)]
@@ -49,9 +69,9 @@ enum Commands {
         /// Path to workflow/pipeline file to execute
         path: PathBuf,
 
-        /// Use emulation mode instead of Docker
-        #[arg(short, long)]
-        emulate: bool,
+        /// Container runtime to use (docker, podman, emulation)
+        #[arg(short, long, value_enum, default_value = "docker")]
+        runtime: RuntimeChoice,
 
         /// Show 'Would execute GitHub action' messages in emulation mode
         #[arg(long, default_value_t = false)]
@@ -71,9 +91,9 @@ enum Commands {
         /// Path to workflow file or directory (defaults to .github/workflows)
         path: Option<PathBuf>,
 
-        /// Use emulation mode instead of Docker
-        #[arg(short, long)]
-        emulate: bool,
+        /// Container runtime to use (docker, podman, emulation)
+        #[arg(short, long, value_enum, default_value = "docker")]
+        runtime: RuntimeChoice,
 
         /// Show 'Would execute GitHub action' messages in emulation mode
         #[arg(long, default_value_t = false)]
@@ -334,18 +354,14 @@ async fn main() {
         }
         Some(Commands::Run {
             path,
-            emulate,
+            runtime,
             show_action_messages: _,
             preserve_containers_on_failure,
             gitlab,
         }) => {
             // Create execution configuration
             let config = executor::ExecutionConfig {
-                runtime_type: if *emulate {
-                    executor::RuntimeType::Emulation
-                } else {
-                    executor::RuntimeType::Docker
-                },
+                runtime_type: runtime.clone().into(),
                 verbose,
                 preserve_containers_on_failure: *preserve_containers_on_failure,
             };
@@ -473,16 +489,12 @@ async fn main() {
         }
         Some(Commands::Tui {
             path,
-            emulate,
+            runtime,
             show_action_messages: _,
             preserve_containers_on_failure,
         }) => {
-            // Set runtime type based on the emulate flag
-            let runtime_type = if *emulate {
-                executor::RuntimeType::Emulation
-            } else {
-                executor::RuntimeType::Docker
-            };
+            // Set runtime type based on the runtime choice
+            let runtime_type = runtime.clone().into();
 
             // Call the TUI implementation from the ui crate
             if let Err(e) = ui::run_wrkflw_tui(

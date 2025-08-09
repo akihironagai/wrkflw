@@ -102,7 +102,7 @@ pub async fn execute_workflow_cli(
         }
     }
 
-    // Check Docker availability if Docker runtime is selected
+    // Check container runtime availability if container runtime is selected
     let runtime_type = match runtime_type {
         RuntimeType::Docker => {
             if !executor::docker::is_available() {
@@ -111,6 +111,15 @@ pub async fn execute_workflow_cli(
                 RuntimeType::Emulation
             } else {
                 RuntimeType::Docker
+            }
+        }
+        RuntimeType::Podman => {
+            if !executor::podman::is_available() {
+                println!("⚠️ Podman is not available. Using emulation mode instead.");
+                logging::warning("Podman is not available. Using emulation mode instead.");
+                RuntimeType::Emulation
+            } else {
+                RuntimeType::Podman
             }
         }
         RuntimeType::Emulation => RuntimeType::Emulation,
@@ -393,7 +402,7 @@ pub fn start_next_workflow_execution(
             );
         }
 
-        // Check Docker availability again if Docker runtime is selected
+        // Check container runtime availability again if container runtime is selected
         let runtime_type = match app.runtime_type {
             RuntimeType::Docker => {
                 // Use safe FD redirection to check Docker availability
@@ -415,6 +424,28 @@ pub fn start_next_workflow_execution(
                     RuntimeType::Emulation
                 } else {
                     RuntimeType::Docker
+                }
+            }
+            RuntimeType::Podman => {
+                // Use safe FD redirection to check Podman availability
+                let is_podman_available =
+                    match utils::fd::with_stderr_to_null(executor::podman::is_available) {
+                        Ok(result) => result,
+                        Err(_) => {
+                            logging::debug(
+                                "Failed to redirect stderr when checking Podman availability.",
+                            );
+                            false
+                        }
+                    };
+
+                if !is_podman_available {
+                    app.logs
+                        .push("Podman is not available. Using emulation mode instead.".to_string());
+                    logging::warning("Podman is not available. Using emulation mode instead.");
+                    RuntimeType::Emulation
+                } else {
+                    RuntimeType::Podman
                 }
             }
             RuntimeType::Emulation => RuntimeType::Emulation,

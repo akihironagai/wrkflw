@@ -40,38 +40,75 @@ pub fn render_status_bar(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App,
         Style::default()
             .bg(match app.runtime_type {
                 RuntimeType::Docker => Color::Blue,
+                RuntimeType::Podman => Color::Cyan,
                 RuntimeType::Emulation => Color::Magenta,
             })
             .fg(Color::White),
     ));
 
-    // Add Docker status if relevant
-    if app.runtime_type == RuntimeType::Docker {
-        // Check Docker silently using safe FD redirection
-        let is_docker_available =
-            match utils::fd::with_stderr_to_null(executor::docker::is_available) {
-                Ok(result) => result,
-                Err(_) => {
-                    logging::debug("Failed to redirect stderr when checking Docker availability.");
-                    false
-                }
-            };
+    // Add container runtime status if relevant
+    match app.runtime_type {
+        RuntimeType::Docker => {
+            // Check Docker silently using safe FD redirection
+            let is_docker_available =
+                match utils::fd::with_stderr_to_null(executor::docker::is_available) {
+                    Ok(result) => result,
+                    Err(_) => {
+                        logging::debug(
+                            "Failed to redirect stderr when checking Docker availability.",
+                        );
+                        false
+                    }
+                };
 
-        status_items.push(Span::raw(" "));
-        status_items.push(Span::styled(
-            if is_docker_available {
-                " Docker: Connected "
-            } else {
-                " Docker: Not Available "
-            },
-            Style::default()
-                .bg(if is_docker_available {
-                    Color::Green
+            status_items.push(Span::raw(" "));
+            status_items.push(Span::styled(
+                if is_docker_available {
+                    " Docker: Connected "
                 } else {
-                    Color::Red
-                })
-                .fg(Color::White),
-        ));
+                    " Docker: Not Available "
+                },
+                Style::default()
+                    .bg(if is_docker_available {
+                        Color::Green
+                    } else {
+                        Color::Red
+                    })
+                    .fg(Color::White),
+            ));
+        }
+        RuntimeType::Podman => {
+            // Check Podman silently using safe FD redirection
+            let is_podman_available =
+                match utils::fd::with_stderr_to_null(executor::podman::is_available) {
+                    Ok(result) => result,
+                    Err(_) => {
+                        logging::debug(
+                            "Failed to redirect stderr when checking Podman availability.",
+                        );
+                        false
+                    }
+                };
+
+            status_items.push(Span::raw(" "));
+            status_items.push(Span::styled(
+                if is_podman_available {
+                    " Podman: Connected "
+                } else {
+                    " Podman: Not Available "
+                },
+                Style::default()
+                    .bg(if is_podman_available {
+                        Color::Green
+                    } else {
+                        Color::Red
+                    })
+                    .fg(Color::White),
+            ));
+        }
+        RuntimeType::Emulation => {
+            // No need to check anything for emulation mode
+        }
     }
 
     // Add validation/execution mode
