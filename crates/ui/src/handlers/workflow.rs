@@ -127,7 +127,13 @@ pub async fn execute_workflow_cli(
         verbose
     ));
 
-    match executor::execute_workflow(path, runtime_type, verbose).await {
+    let config = executor::ExecutionConfig {
+        runtime_type,
+        verbose,
+        preserve_containers_on_failure: false, // Default for this path
+    };
+
+    match executor::execute_workflow(path, config).await {
         Ok(result) => {
             println!("\nWorkflow execution results:");
 
@@ -415,6 +421,7 @@ pub fn start_next_workflow_execution(
         };
 
         let validation_mode = app.validation_mode;
+        let preserve_containers_on_failure = app.preserve_containers_on_failure;
 
         // Update workflow status and add execution details
         app.workflows[next_idx].status = WorkflowStatus::Running;
@@ -483,9 +490,15 @@ pub fn start_next_workflow_execution(
                     }
                 } else {
                     // Use safe FD redirection for execution
+                    let config = executor::ExecutionConfig {
+                        runtime_type,
+                        verbose,
+                        preserve_containers_on_failure,
+                    };
+
                     let execution_result = utils::fd::with_stderr_to_null(|| {
                         futures::executor::block_on(async {
-                            executor::execute_workflow(&workflow_path, runtime_type, verbose).await
+                            executor::execute_workflow(&workflow_path, config).await
                         })
                     })
                     .map_err(|e| format!("Failed to redirect stderr during execution: {}", e))?;

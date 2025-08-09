@@ -90,6 +90,9 @@ wrkflw run --emulate .github/workflows/ci.yml
 
 # Run with verbose output
 wrkflw run --verbose .github/workflows/ci.yml
+
+# Preserve failed containers for debugging
+wrkflw run --preserve-containers-on-failure .github/workflows/ci.yml
 ```
 
 ### Using the TUI Interface
@@ -222,6 +225,23 @@ WRKFLW supports composite actions, which are actions made up of multiple steps. 
 ### Container Cleanup
 
 WRKFLW automatically cleans up any Docker containers created during workflow execution, even if the process is interrupted with Ctrl+C.
+
+For debugging failed workflows, you can preserve containers that fail by using the `--preserve-containers-on-failure` flag:
+
+```bash
+# Preserve failed containers for debugging
+wrkflw run --preserve-containers-on-failure .github/workflows/build.yml
+
+# Also available in TUI mode
+wrkflw tui --preserve-containers-on-failure
+```
+
+When a container fails with this flag enabled, WRKFLW will:
+- Keep the failed container running instead of removing it
+- Log the container ID and provide inspection instructions
+- Show a message like: `Preserving container abc123 for debugging (exit code: 1). Use 'docker exec -it abc123 bash' to inspect.`
+
+This allows you to inspect the exact state of the container when the failure occurred, examine files, check environment variables, and debug issues more effectively.
 
 ## Limitations
 

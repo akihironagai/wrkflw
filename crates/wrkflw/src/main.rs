@@ -9,7 +9,7 @@ use std::path::PathBuf;
     name = "wrkflw",
     about = "GitHub & GitLab CI/CD validator and executor",
     version,
-    long_about = "A CI/CD validator and executor that runs workflows locally.\n\nExamples:\n  wrkflw validate                             # Validate all workflows in .github/workflows\n  wrkflw run .github/workflows/build.yml      # Run a specific workflow\n  wrkflw run .gitlab-ci.yml                   # Run a GitLab CI pipeline\n  wrkflw --verbose run .github/workflows/build.yml  # Run with more output\n  wrkflw --debug run .github/workflows/build.yml    # Run with detailed debug information\n  wrkflw run --emulate .github/workflows/build.yml  # Use emulation mode instead of Docker"
+    long_about = "A CI/CD validator and executor that runs workflows locally.\n\nExamples:\n  wrkflw validate                             # Validate all workflows in .github/workflows\n  wrkflw run .github/workflows/build.yml      # Run a specific workflow\n  wrkflw run .gitlab-ci.yml                   # Run a GitLab CI pipeline\n  wrkflw --verbose run .github/workflows/build.yml  # Run with more output\n  wrkflw --debug run .github/workflows/build.yml    # Run with detailed debug information\n  wrkflw run --emulate .github/workflows/build.yml  # Use emulation mode instead of Docker\n  wrkflw run --preserve-containers-on-failure .github/workflows/build.yml  # Keep failed containers for debugging"
 )]
 struct Wrkflw {
     #[command(subcommand)]
@@ -49,6 +49,10 @@ enum Commands {
         #[arg(long, default_value_t = false)]
         show_action_messages: bool,
 
+        /// Preserve Docker containers on failure for debugging (Docker mode only)
+        #[arg(long)]
+        preserve_containers_on_failure: bool,
+
         /// Explicitly run as GitLab CI/CD pipeline
         #[arg(long)]
         gitlab: bool,
@@ -66,6 +70,10 @@ enum Commands {
         /// Show 'Would execute GitHub action' messages in emulation mode
         #[arg(long, default_value_t = false)]
         show_action_messages: bool,
+
+        /// Preserve Docker containers on failure for debugging (Docker mode only)
+        #[arg(long)]
+        preserve_containers_on_failure: bool,
     },
 
     /// Trigger a GitHub workflow remotely
@@ -305,13 +313,18 @@ async fn main() {
             path,
             emulate,
             show_action_messages: _,
+            preserve_containers_on_failure,
             gitlab,
         }) => {
-            // Determine the runtime type
-            let runtime_type = if *emulate {
-                executor::RuntimeType::Emulation
-            } else {
-                executor::RuntimeType::Docker
+            // Create execution configuration
+            let config = executor::ExecutionConfig {
+                runtime_type: if *emulate {
+                    executor::RuntimeType::Emulation
+                } else {
+                    executor::RuntimeType::Docker
+                },
+                verbose,
+                preserve_containers_on_failure: *preserve_containers_on_failure,
             };
 
             // Check if we're explicitly or implicitly running a GitLab pipeline
@@ -325,7 +338,7 @@ async fn main() {
             logging::info(&format!("Running {} at: {}", workflow_type, path.display()));
 
             // Execute the workflow
-            let result = executor::execute_workflow(path, runtime_type, verbose)
+            let result = executor::execute_workflow(path, config)
                 .await
                 .unwrap_or_else(|e| {
                     eprintln!("Error executing workflow: {}", e);
@@ -439,6 +452,7 @@ async fn main() {
             path,
             emulate,
             show_action_messages: _,
+            preserve_containers_on_failure,
         }) => {
             // Set runtime type based on the emulate flag
             let runtime_type = if *emulate {
@@ -448,7 +462,14 @@ async fn main() {
             };
 
             // Call the TUI implementation from the ui crate
-            if let Err(e) = ui::run_wrkflw_tui(path.as_ref(), runtime_type, verbose).await {
+            if let Err(e) = ui::run_wrkflw_tui(
+                path.as_ref(),
+                runtime_type,
+                verbose,
+                *preserve_containers_on_failure,
+            )
+            .await
+            {
                 eprintln!("Error running TUI: {}", e);
                 std::process::exit(1);
             }
@@ -477,7 +498,7 @@ async fn main() {
             let runtime_type = executor::RuntimeType::Docker;
 
             // Call the TUI implementation from the ui crate with default path
-            if let Err(e) = ui::run_wrkflw_tui(None, runtime_type, verbose).await {
+            if let Err(e) = ui::run_wrkflw_tui(None, runtime_type, verbose, false).await {
                 eprintln!("Error running TUI: {}", e);
                 std::process::exit(1);
             }

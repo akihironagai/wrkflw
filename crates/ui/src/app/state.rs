@@ -19,6 +19,7 @@ pub struct App {
     pub show_help: bool,
     pub runtime_type: RuntimeType,
     pub validation_mode: bool,
+    pub preserve_containers_on_failure: bool,
     pub execution_queue: Vec<usize>, // Indices of workflows to execute
     pub current_execution: Option<usize>,
     pub logs: Vec<String>,                    // Overall execution logs
@@ -42,7 +43,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(runtime_type: RuntimeType, tx: mpsc::Sender<ExecutionResultMsg>) -> App {
+    pub fn new(
+        runtime_type: RuntimeType,
+        tx: mpsc::Sender<ExecutionResultMsg>,
+        preserve_containers_on_failure: bool,
+    ) -> App {
         let mut workflow_list_state = ListState::default();
         workflow_list_state.select(Some(0));
 
@@ -119,6 +124,7 @@ impl App {
             show_help: false,
             runtime_type,
             validation_mode: false,
+            preserve_containers_on_failure,
             execution_queue: Vec::new(),
             current_execution: None,
             logs: initial_logs,
