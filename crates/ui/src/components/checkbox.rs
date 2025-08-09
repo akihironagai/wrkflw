@@ -40,7 +40,7 @@ impl Checkbox {
     }
 
     /// Render the checkbox
-    pub fn render(&self) -> Paragraph {
+    pub fn render(&self) -> Paragraph<'_> {
         let checkbox = if self.is_checked { "[✓]" } else { "[ ]" };
 
         let style = if self.is_selected {

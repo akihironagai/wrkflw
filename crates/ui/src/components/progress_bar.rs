@@ -39,7 +39,7 @@ impl ProgressBar {
     }
 
     /// Render the progress bar
-    pub fn render(&self) -> Gauge {
+    pub fn render(&self) -> Gauge<'_> {
         let label = match &self.label {
             Some(lbl) => format!("{} {:.0}%", lbl, self.progress * 100.0),
             None => format!("{:.0}%", self.progress * 100.0),
