@@ -26,6 +26,7 @@ pub async fn run_wrkflw_tui(
     path: Option<&PathBuf>,
     runtime_type: RuntimeType,
     verbose: bool,
+    preserve_containers_on_failure: bool,
 ) -> io::Result<()> {
     // Terminal setup
     enable_raw_mode()?;
@@ -41,7 +42,11 @@ pub async fn run_wrkflw_tui(
     ) = mpsc::channel();
 
     // Initialize app state
-    let mut app = App::new(runtime_type.clone(), tx.clone());
+    let mut app = App::new(
+        runtime_type.clone(),
+        tx.clone(),
+        preserve_containers_on_failure,
+    );
 
     if app.validation_mode {
         app.logs.push("Starting in validation mode".to_string());

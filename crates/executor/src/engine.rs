@@ -24,19 +24,18 @@ use runtime::emulation;
 /// Execute a GitHub Actions workflow file locally
 pub async fn execute_workflow(
     workflow_path: &Path,
-    runtime_type: RuntimeType,
-    verbose: bool,
+    config: ExecutionConfig,
 ) -> Result<ExecutionResult, ExecutionError> {
     logging::info(&format!("Executing workflow: {}", workflow_path.display()));
-    logging::info(&format!("Runtime: {:?}", runtime_type));
+    logging::info(&format!("Runtime: {:?}", config.runtime_type));
 
     // Determine if this is a GitLab CI/CD pipeline or GitHub Actions workflow
     let is_gitlab = is_gitlab_pipeline(workflow_path);
 
     if is_gitlab {
-        execute_gitlab_pipeline(workflow_path, runtime_type, verbose).await
+        execute_gitlab_pipeline(workflow_path, config.clone()).await
     } else {
-        execute_github_workflow(workflow_path, runtime_type, verbose).await
+        execute_github_workflow(workflow_path, config.clone()).await
     }
 }
 
@@ -72,8 +71,7 @@ fn is_gitlab_pipeline(path: &Path) -> bool {
 /// Execute a GitHub Actions workflow file locally
 async fn execute_github_workflow(
     workflow_path: &Path,
-    runtime_type: RuntimeType,
-    verbose: bool,
+    config: ExecutionConfig,
 ) -> Result<ExecutionResult, ExecutionError> {
     // 1. Parse workflow file
     let workflow = parse_workflow(workflow_path)?;
@@ -82,7 +80,10 @@ async fn execute_github_workflow(
     let execution_plan = dependency::resolve_dependencies(&workflow)?;
 
     // 3. Initialize appropriate runtime
-    let runtime = initialize_runtime(runtime_type.clone())?;
+    let runtime = initialize_runtime(
+        config.runtime_type.clone(),
+        config.preserve_containers_on_failure,
+    )?;
 
     // Create a temporary workspace directory
     let workspace_dir = tempfile::tempdir()
@@ -94,7 +95,7 @@ async fn execute_github_workflow(
     // Add runtime mode to environment
     env_context.insert(
         "WRKFLW_RUNTIME_MODE".to_string(),
-        if runtime_type == RuntimeType::Emulation {
+        if config.runtime_type == RuntimeType::Emulation {
             "emulation".to_string()
         } else {
             "docker".to_string()
@@ -124,7 +125,7 @@ async fn execute_github_workflow(
             &workflow,
             runtime.as_ref(),
             &env_context,
-            verbose,
+            config.verbose,
         )
         .await?;
 
@@ -164,8 +165,7 @@ async fn execute_github_workflow(
 /// Execute a GitLab CI/CD pipeline locally
 async fn execute_gitlab_pipeline(
     pipeline_path: &Path,
-    runtime_type: RuntimeType,
-    verbose: bool,
+    config: ExecutionConfig,
 ) -> Result<ExecutionResult, ExecutionError> {
     logging::info("Executing GitLab CI/CD pipeline");
 
@@ -180,7 +180,10 @@ async fn execute_gitlab_pipeline(
     let execution_plan = resolve_gitlab_dependencies(&pipeline, &workflow)?;
 
     // 4. Initialize appropriate runtime
-    let runtime = initialize_runtime(runtime_type.clone())?;
+    let runtime = initialize_runtime(
+        config.runtime_type.clone(),
+        config.preserve_containers_on_failure,
+    )?;
 
     // Create a temporary workspace directory
     let workspace_dir = tempfile::tempdir()
@@ -192,7 +195,7 @@ async fn execute_gitlab_pipeline(
     // Add runtime mode to environment
     env_context.insert(
         "WRKFLW_RUNTIME_MODE".to_string(),
-        if runtime_type == RuntimeType::Emulation {
+        if config.runtime_type == RuntimeType::Emulation {
             "emulation".to_string()
         } else {
             "docker".to_string()
@@ -216,7 +219,7 @@ async fn execute_gitlab_pipeline(
             &workflow,
             runtime.as_ref(),
             &env_context,
-            verbose,
+            config.verbose,
         )
         .await?;
 
@@ -356,12 +359,13 @@ fn resolve_gitlab_dependencies(
 // Determine if Docker is available or fall back to emulation
 fn initialize_runtime(
     runtime_type: RuntimeType,
+    preserve_containers_on_failure: bool,
 ) -> Result<Box<dyn ContainerRuntime>, ExecutionError> {
     match runtime_type {
         RuntimeType::Docker => {
             if docker::is_available() {
                 // Handle the Result returned by DockerRuntime::new()
-                match docker::DockerRuntime::new() {
+                match docker::DockerRuntime::new_with_config(preserve_containers_on_failure) {
                     Ok(docker_runtime) => Ok(Box::new(docker_runtime)),
                     Err(e) => {
                         logging::error(&format!(
@@ -384,6 +388,13 @@ fn initialize_runtime(
 pub enum RuntimeType {
     Docker,
     Emulation,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExecutionConfig {
+    pub runtime_type: RuntimeType,
+    pub verbose: bool,
+    pub preserve_containers_on_failure: bool,
 }
 
 pub struct ExecutionResult {

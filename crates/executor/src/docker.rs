@@ -24,15 +24,23 @@ static CUSTOMIZED_IMAGES: Lazy<Mutex<HashMap<String, String>>> =
 
 pub struct DockerRuntime {
     docker: Docker,
+    preserve_containers_on_failure: bool,
 }
 
 impl DockerRuntime {
     pub fn new() -> Result<Self, ContainerError> {
+        Self::new_with_config(false)
+    }
+
+    pub fn new_with_config(preserve_containers_on_failure: bool) -> Result<Self, ContainerError> {
         let docker = Docker::connect_with_local_defaults().map_err(|e| {
             ContainerError::ContainerStart(format!("Failed to connect to Docker: {}", e))
         })?;
 
-        Ok(DockerRuntime { docker })
+        Ok(DockerRuntime {
+            docker,
+            preserve_containers_on_failure,
+        })
     }
 
     // Add a method to store and retrieve customized images (e.g., with Python installed)
@@ -998,13 +1006,23 @@ impl DockerRuntime {
             logging::warning("Retrieving container logs timed out");
         }
 
-        // Clean up container with a timeout
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_secs(10),
-            self.docker.remove_container(&container.id, None),
-        )
-        .await;
-        untrack_container(&container.id);
+        // Clean up container with a timeout, but preserve on failure if configured
+        if exit_code == 0 || !self.preserve_containers_on_failure {
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_secs(10),
+                self.docker.remove_container(&container.id, None),
+            )
+            .await;
+            untrack_container(&container.id);
+        } else {
+            // Container failed and we want to preserve it for debugging
+            logging::info(&format!(
+                "Preserving container {} for debugging (exit code: {}). Use 'docker exec -it {} bash' to inspect.",
+                container.id, exit_code, container.id
+            ));
+            // Still untrack it from the automatic cleanup system to prevent it from being cleaned up later
+            untrack_container(&container.id);
+        }
 
         // Log detailed information about the command execution for debugging
         if exit_code != 0 {
