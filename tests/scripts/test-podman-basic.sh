@@ -59,7 +59,7 @@ fi
 
 # Test 2: Check invalid runtime rejection
 print_status "Test 2: Testing invalid runtime rejection..."
-if ./target/release/wrkflw run --runtime invalid test-workflows/example.yml 2>&1 | grep -q "invalid value"; then
+if ./target/release/wrkflw run --runtime invalid tests/workflows/example.yml 2>&1 | grep -q "invalid value"; then
     print_success "Invalid runtime properly rejected"
 else
     print_error "Invalid runtime not properly rejected"

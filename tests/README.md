@@ -1,6 +1,6 @@
 # Testing Strategy
 
-This directory contains integration tests for the `wrkflw` project. We follow the Rust testing best practices by organizing tests as follows:
+This directory contains all tests and test-related files for the `wrkflw` project. We follow the Rust testing best practices by organizing tests as follows:
 
 ## Test Organization
 
@@ -10,6 +10,17 @@ This directory contains integration tests for the `wrkflw` project. We follow th
   - `reusable_workflow_test.rs` - Tests for reusable workflow validation
 - **End-to-End Tests**: Also located in this `tests/` directory
   - `cleanup_test.rs` - Tests for cleanup functionality with Docker resources
+
+## Test Directory Structure
+
+- **`fixtures/`**: Test data and configuration files
+  - `gitlab-ci/` - GitLab CI configuration files for testing
+- **`workflows/`**: GitHub Actions workflow files for testing
+  - Various YAML files for testing workflow validation and execution
+- **`scripts/`**: Test automation scripts
+  - `test-podman-basic.sh` - Basic Podman integration test script
+  - `test-preserve-containers.sh` - Container preservation testing script
+- **`TESTING_PODMAN.md`**: Comprehensive Podman testing documentation
 
 ## Running Tests
 

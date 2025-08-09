@@ -70,21 +70,21 @@ Expected: Should show `--runtime` option with default value `docker`.
 #### 1.2 Test Podman Runtime Selection
 ```bash
 # Should accept podman as runtime
-./target/release/wrkflw run --runtime podman test-workflows/example.yml
+./target/release/wrkflw run --runtime podman tests/workflows/example.yml
 ```
 Expected: Should run without CLI argument errors.
 
 #### 1.3 Test Emulation Runtime Selection
 ```bash
 # Should accept emulation as runtime
-./target/release/wrkflw run --runtime emulation test-workflows/example.yml
+./target/release/wrkflw run --runtime emulation tests/workflows/example.yml
 ```
 Expected: Should run without CLI argument errors.
 
 #### 1.4 Test Invalid Runtime Selection
 ```bash
 # Should reject invalid runtime
-./target/release/wrkflw run --runtime invalid test-workflows/example.yml
+./target/release/wrkflw run --runtime invalid tests/workflows/example.yml
 ```
 Expected: Should show error about invalid runtime choice.
 
@@ -172,7 +172,7 @@ Expected: All three runtimes should produce similar results (emulation may have 
 
 #### 4.1 Test TUI Runtime Selection
 ```bash
-./target/release/wrkflw tui test-workflows/
+./target/release/wrkflw tui tests/workflows/
 ```
 
 **Test Steps:**
