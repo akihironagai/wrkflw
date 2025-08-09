@@ -553,6 +553,24 @@ async fn execute_job_with_matrix(
         ExecutionError::Execution(format!("Job '{}' not found in workflow", job_name))
     })?;
 
+    // Evaluate job condition if present
+    if let Some(if_condition) = &job.if_condition {
+        let should_run = evaluate_job_condition(if_condition, env_context, workflow);
+        if !should_run {
+            logging::info(&format!(
+                "⏭️ Skipping job '{}' due to condition: {}",
+                job_name, if_condition
+            ));
+            // Return a skipped job result
+            return Ok(vec![JobResult {
+                name: job_name.to_string(),
+                status: JobStatus::Skipped,
+                steps: Vec::new(),
+                logs: String::new(),
+            }]);
+        }
+    }
+
     // Check if this is a matrix job
     if let Some(matrix_config) = &job.matrix {
         // Expand the matrix into combinations
@@ -1981,4 +1999,48 @@ fn convert_yaml_to_step(step_yaml: &serde_yaml::Value) -> Result<workflow::Step,
         env,
         continue_on_error,
     })
+}
+
+/// Evaluate a job condition expression
+/// This is a simplified implementation that handles basic GitHub Actions expressions
+fn evaluate_job_condition(
+    condition: &str,
+    env_context: &HashMap<String, String>,
+    workflow: &WorkflowDefinition,
+) -> bool {
+    logging::debug(&format!("Evaluating condition: {}", condition));
+
+    // For now, implement basic pattern matching for common conditions
+    // TODO: Implement a full GitHub Actions expression evaluator
+
+    // Handle simple boolean conditions
+    if condition == "true" {
+        return true;
+    }
+    if condition == "false" {
+        return false;
+    }
+
+    // Handle github.event.pull_request.draft == false
+    if condition.contains("github.event.pull_request.draft == false") {
+        // For local execution, assume this is always true (not a draft)
+        return true;
+    }
+
+    // Handle needs.jobname.outputs.outputname == 'value' patterns
+    if condition.contains("needs.") && condition.contains(".outputs.") {
+        // For now, simulate that outputs are available but empty
+        // This means conditions like needs.changes.outputs.source-code == 'true' will be false
+        logging::debug(
+            "Evaluating needs.outputs condition - defaulting to false for local execution",
+        );
+        return false;
+    }
+
+    // Default to true for unknown conditions to avoid breaking workflows
+    logging::warning(&format!(
+        "Unknown condition pattern: '{}' - defaulting to true",
+        condition
+    ));
+    true
 }

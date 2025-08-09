@@ -1,10 +1,30 @@
 use matrix::MatrixConfig;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
 use super::schema::SchemaValidator;
+
+// Custom deserializer for needs field that handles both string and array formats
+fn deserialize_needs<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrVec {
+        String(String),
+        Vec(Vec<String>),
+    }
+
+    let value = Option::<StringOrVec>::deserialize(deserializer)?;
+    match value {
+        Some(StringOrVec::String(s)) => Ok(Some(vec![s])),
+        Some(StringOrVec::Vec(v)) => Ok(Some(v)),
+        None => Ok(None),
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WorkflowDefinition {
@@ -20,7 +40,7 @@ pub struct WorkflowDefinition {
 pub struct Job {
     #[serde(rename = "runs-on")]
     pub runs_on: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_needs")]
     pub needs: Option<Vec<String>>,
     pub steps: Vec<Step>,
     #[serde(default)]
@@ -29,6 +49,12 @@ pub struct Job {
     pub matrix: Option<MatrixConfig>,
     #[serde(default)]
     pub services: HashMap<String, Service>,
+    #[serde(default, rename = "if")]
+    pub if_condition: Option<String>,
+    #[serde(default)]
+    pub outputs: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub permissions: Option<HashMap<String, String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
