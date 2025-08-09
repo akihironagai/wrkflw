@@ -34,6 +34,14 @@ enum Commands {
         /// Explicitly validate as GitLab CI/CD pipeline
         #[arg(long)]
         gitlab: bool,
+
+        /// Set exit code to 1 on validation failure
+        #[arg(long = "exit-code", default_value_t = true)]
+        exit_code: bool,
+
+        /// Don't set exit code to 1 on validation failure (overrides --exit-code)
+        #[arg(long = "no-exit-code", conflicts_with = "exit_code")]
+        no_exit_code: bool,
     },
 
     /// Execute workflow or pipeline files locally
@@ -257,7 +265,12 @@ async fn main() {
     tokio::spawn(handle_signals());
 
     match &cli.command {
-        Some(Commands::Validate { path, gitlab }) => {
+        Some(Commands::Validate {
+            path,
+            gitlab,
+            exit_code,
+            no_exit_code,
+        }) => {
             // Determine the path to validate
             let validate_path = path
                 .clone()
@@ -271,6 +284,7 @@ async fn main() {
 
             // Determine if we're validating a GitLab pipeline based on the --gitlab flag or file detection
             let force_gitlab = *gitlab;
+            let mut validation_failed = false;
 
             if validate_path.is_dir() {
                 // Validate all workflow files in the directory
@@ -292,21 +306,30 @@ async fn main() {
                     let path = entry.path();
                     let is_gitlab = force_gitlab || is_gitlab_pipeline(&path);
 
-                    if is_gitlab {
-                        validate_gitlab_pipeline(&path, verbose);
+                    let file_failed = if is_gitlab {
+                        validate_gitlab_pipeline(&path, verbose)
                     } else {
-                        validate_github_workflow(&path, verbose);
+                        validate_github_workflow(&path, verbose)
+                    };
+
+                    if file_failed {
+                        validation_failed = true;
                     }
                 }
             } else {
                 // Validate a single workflow file
                 let is_gitlab = force_gitlab || is_gitlab_pipeline(&validate_path);
 
-                if is_gitlab {
-                    validate_gitlab_pipeline(&validate_path, verbose);
+                validation_failed = if is_gitlab {
+                    validate_gitlab_pipeline(&validate_path, verbose)
                 } else {
-                    validate_github_workflow(&validate_path, verbose);
-                }
+                    validate_github_workflow(&validate_path, verbose)
+                };
+            }
+
+            // Set exit code if validation failed and exit_code flag is true (and no_exit_code is false)
+            if validation_failed && *exit_code && !*no_exit_code {
+                std::process::exit(1);
             }
         }
         Some(Commands::Run {
@@ -507,22 +530,32 @@ async fn main() {
 }
 
 /// Validate a GitHub workflow file
-fn validate_github_workflow(path: &Path, verbose: bool) {
+/// Returns true if validation failed, false if it passed
+fn validate_github_workflow(path: &Path, verbose: bool) -> bool {
     print!("Validating GitHub workflow file: {}... ", path.display());
 
     // Use the ui crate's validate_workflow function
     match ui::validate_workflow(path, verbose) {
         Ok(_) => {
             // The detailed validation output is already printed by the function
+            // We need to check if there were validation issues
+            // Since ui::validate_workflow doesn't return the validation result directly,
+            // we need to call the evaluator directly to get the result
+            match evaluator::evaluate_workflow_file(path, verbose) {
+                Ok(result) => !result.is_valid,
+                Err(_) => true, // Parse errors count as validation failure
+            }
         }
         Err(e) => {
             eprintln!("Error validating workflow: {}", e);
+            true // Any error counts as validation failure
         }
     }
 }
 
 /// Validate a GitLab CI/CD pipeline file
-fn validate_gitlab_pipeline(path: &Path, verbose: bool) {
+/// Returns true if validation failed, false if it passed
+fn validate_gitlab_pipeline(path: &Path, verbose: bool) -> bool {
     print!("Validating GitLab CI pipeline file: {}... ", path.display());
 
     // Parse and validate the pipeline file
@@ -538,13 +571,18 @@ fn validate_gitlab_pipeline(path: &Path, verbose: bool) {
                 for issue in validation_result.issues {
                     println!("   - {}", issue);
                 }
-            } else if verbose {
-                println!("✅ All validation checks passed");
+                true // Validation failed
+            } else {
+                if verbose {
+                    println!("✅ All validation checks passed");
+                }
+                false // Validation passed
             }
         }
         Err(e) => {
             println!("❌ Invalid");
             eprintln!("Validation failed: {}", e);
+            true // Parse error counts as validation failure
         }
     }
 }
