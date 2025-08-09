@@ -13,7 +13,7 @@ WRKFLW is a powerful command-line tool for validating and executing GitHub Actio
 ## Features
 
 - **TUI Interface**: A full-featured terminal user interface for managing and monitoring workflow executions
-- **Validate Workflow Files**: Check for syntax errors and common mistakes in GitHub Actions workflow files
+- **Validate Workflow Files**: Check for syntax errors and common mistakes in GitHub Actions workflow files with proper exit codes for CI/CD integration
 - **Execute Workflows Locally**: Run workflows directly on your machine using Docker containers
 - **Emulation Mode**: Optional execution without Docker by emulating the container environment locally
 - **Job Dependency Resolution**: Automatically determines the correct execution order based on job dependencies
@@ -77,7 +77,37 @@ wrkflw validate path/to/workflows
 
 # Validate with verbose output
 wrkflw validate --verbose path/to/workflow.yml
+
+# Validate GitLab CI pipelines
+wrkflw validate .gitlab-ci.yml --gitlab
+
+# Disable exit codes for custom error handling (default: enabled)
+wrkflw validate --no-exit-code path/to/workflow.yml
 ```
+
+#### Exit Codes for CI/CD Integration
+
+By default, `wrkflw validate` sets the exit code to `1` when validation fails, making it perfect for CI/CD pipelines and scripts:
+
+```bash
+# In CI/CD scripts - validation failure will cause the script to exit
+if ! wrkflw validate; then
+    echo "❌ Workflow validation failed!"
+    exit 1
+fi
+echo "✅ All workflows are valid!"
+
+# For custom error handling, disable exit codes
+wrkflw validate --no-exit-code
+if [ $? -eq 0 ]; then
+    echo "Validation completed (check output for details)"
+fi
+```
+
+**Exit Code Behavior:**
+- `0`: All validations passed successfully
+- `1`: One or more validation failures detected
+- `2`: Command usage error (invalid arguments, file not found, etc.)
 
 ### Running Workflows in CLI Mode
 
@@ -143,17 +173,25 @@ The terminal user interface provides an interactive way to manage workflows:
 
 ```bash
 $ wrkflw validate .github/workflows/rust.yml
+Validating GitHub workflow file: .github/workflows/rust.yml... Validating 1 workflow file(s)...
+✅ Valid: .github/workflows/rust.yml
 
-Validating workflows in: .github/workflows/rust.yml
-============================================================
-✅ Valid: rust.yml
-------------------------------------------------------------
+Summary: 1 valid, 0 invalid
 
-Summary
-============================================================
-✅ 1 valid workflow file(s)
+$ echo $?
+0
 
-All workflows are valid! 🎉
+# Example with validation failure
+$ wrkflw validate .github/workflows/invalid.yml
+Validating GitHub workflow file: .github/workflows/invalid.yml... Validating 1 workflow file(s)...
+❌ Invalid: .github/workflows/invalid.yml
+   1. Job 'test' is missing 'runs-on' field
+   2. Job 'test' is missing 'steps' section
+
+Summary: 0 valid, 1 invalid
+
+$ echo $?
+1
 ```
 
 ### Running a Workflow
@@ -246,7 +284,7 @@ This allows you to inspect the exact state of the container when the failure occ
 ## Limitations
 
 ### Supported Features
-- ✅ Basic workflow syntax and validation (all YAML syntax checks, required fields, and structure)
+- ✅ Basic workflow syntax and validation (all YAML syntax checks, required fields, and structure) with proper exit codes for CI/CD integration
 - ✅ Job dependency resolution and parallel execution (all jobs with correct 'needs' relationships are executed in the right order, and independent jobs run in parallel)
 - ✅ Matrix builds (supported for reasonable matrix sizes; very large matrices may be slow or resource-intensive)
 - ✅ Environment variables and GitHub context (all standard GitHub Actions environment variables and context objects are emulated)
