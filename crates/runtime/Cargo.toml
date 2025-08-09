@@ -8,7 +8,7 @@ license.workspace = true
 [dependencies]
 # Internal crates
 models = { path = "../models" }
-logging = { path = "../logging", version = "0.4.0" }
+logging = { path = "../logging", version = "0.5.0" }
 
 # External dependencies
 async-trait.workspace = true
@@ -18,5 +18,5 @@ serde_yaml.workspace = true
 tempfile = "3.9"
 tokio.workspace = true
 futures = "0.3"
-utils = { path = "../utils", version = "0.4.0" }
+utils = { path = "../utils", version = "0.5.0" }
 which = "4.4"
