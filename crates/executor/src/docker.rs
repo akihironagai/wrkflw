@@ -6,14 +6,14 @@ use bollard::{
     Docker,
 };
 use futures_util::StreamExt;
-use logging;
 use once_cell::sync::Lazy;
-use runtime::container::{ContainerError, ContainerOutput, ContainerRuntime};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Mutex;
-use utils;
-use utils::fd;
+use wrkflw_logging;
+use wrkflw_runtime::container::{ContainerError, ContainerOutput, ContainerRuntime};
+use wrkflw_utils;
+use wrkflw_utils::fd;
 
 static RUNNING_CONTAINERS: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
 static CREATED_NETWORKS: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -50,7 +50,7 @@ impl DockerRuntime {
         match CUSTOMIZED_IMAGES.lock() {
             Ok(images) => images.get(&key).cloned(),
             Err(e) => {
-                logging::error(&format!("Failed to acquire lock: {}", e));
+                wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
                 None
             }
         }
@@ -62,7 +62,7 @@ impl DockerRuntime {
         if let Err(e) = CUSTOMIZED_IMAGES.lock().map(|mut images| {
             images.insert(key, new_image.to_string());
         }) {
-            logging::error(&format!("Failed to acquire lock: {}", e));
+            wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
         }
     }
 
@@ -72,7 +72,7 @@ impl DockerRuntime {
         let image_keys = match CUSTOMIZED_IMAGES.lock() {
             Ok(keys) => keys,
             Err(e) => {
-                logging::error(&format!("Failed to acquire lock: {}", e));
+                wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
                 return None;
             }
         };
@@ -107,7 +107,7 @@ impl DockerRuntime {
         match CUSTOMIZED_IMAGES.lock() {
             Ok(images) => images.get(&key).cloned(),
             Err(e) => {
-                logging::error(&format!("Failed to acquire lock: {}", e));
+                wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
                 None
             }
         }
@@ -134,7 +134,7 @@ impl DockerRuntime {
         if let Err(e) = CUSTOMIZED_IMAGES.lock().map(|mut images| {
             images.insert(key, new_image.to_string());
         }) {
-            logging::error(&format!("Failed to acquire lock: {}", e));
+            wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
         }
     }
 
@@ -318,7 +318,7 @@ pub fn is_available() -> bool {
                         }
                     }
                     Err(_) => {
-                        logging::debug("Docker CLI is not available");
+                        wrkflw_logging::debug("Docker CLI is not available");
                         return false;
                     }
                 }
@@ -331,7 +331,7 @@ pub fn is_available() -> bool {
             {
                 Ok(rt) => rt,
                 Err(e) => {
-                    logging::error(&format!(
+                    wrkflw_logging::error(&format!(
                         "Failed to create runtime for Docker availability check: {}",
                         e
                     ));
@@ -352,17 +352,25 @@ pub fn is_available() -> bool {
                             {
                                 Ok(Ok(_)) => true,
                                 Ok(Err(e)) => {
-                                    logging::debug(&format!("Docker daemon ping failed: {}", e));
+                                    wrkflw_logging::debug(&format!(
+                                        "Docker daemon ping failed: {}",
+                                        e
+                                    ));
                                     false
                                 }
                                 Err(_) => {
-                                    logging::debug("Docker daemon ping timed out after 1 second");
+                                    wrkflw_logging::debug(
+                                        "Docker daemon ping timed out after 1 second",
+                                    );
                                     false
                                 }
                             }
                         }
                         Err(e) => {
-                            logging::debug(&format!("Docker daemon connection failed: {}", e));
+                            wrkflw_logging::debug(&format!(
+                                "Docker daemon connection failed: {}",
+                                e
+                            ));
                             false
                         }
                     }
@@ -371,7 +379,7 @@ pub fn is_available() -> bool {
                 {
                     Ok(result) => result,
                     Err(_) => {
-                        logging::debug("Docker availability check timed out");
+                        wrkflw_logging::debug("Docker availability check timed out");
                         false
                     }
                 }
@@ -379,7 +387,9 @@ pub fn is_available() -> bool {
         }) {
             Ok(result) => result,
             Err(_) => {
-                logging::debug("Failed to redirect stderr when checking Docker availability");
+                wrkflw_logging::debug(
+                    "Failed to redirect stderr when checking Docker availability",
+                );
                 false
             }
         }
@@ -393,7 +403,7 @@ pub fn is_available() -> bool {
             return match handle.join() {
                 Ok(result) => result,
                 Err(_) => {
-                    logging::warning("Docker availability check thread panicked");
+                    wrkflw_logging::warning("Docker availability check thread panicked");
                     false
                 }
             };
@@ -401,7 +411,9 @@ pub fn is_available() -> bool {
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
-    logging::warning("Docker availability check timed out, assuming Docker is not available");
+    wrkflw_logging::warning(
+        "Docker availability check timed out, assuming Docker is not available",
+    );
     false
 }
 
@@ -444,19 +456,19 @@ pub async fn cleanup_resources(docker: &Docker) {
             tokio::join!(cleanup_containers(docker), cleanup_networks(docker));
 
         if let Err(e) = container_result {
-            logging::error(&format!("Error during container cleanup: {}", e));
+            wrkflw_logging::error(&format!("Error during container cleanup: {}", e));
         }
 
         if let Err(e) = network_result {
-            logging::error(&format!("Error during network cleanup: {}", e));
+            wrkflw_logging::error(&format!("Error during network cleanup: {}", e));
         }
     })
     .await
     {
-        Ok(_) => logging::debug("Docker cleanup completed within timeout"),
-        Err(_) => {
-            logging::warning("Docker cleanup timed out, some resources may not have been removed")
-        }
+        Ok(_) => wrkflw_logging::debug("Docker cleanup completed within timeout"),
+        Err(_) => wrkflw_logging::warning(
+            "Docker cleanup timed out, some resources may not have been removed",
+        ),
     }
 }
 
@@ -468,7 +480,7 @@ pub async fn cleanup_containers(docker: &Docker) -> Result<(), String> {
             match RUNNING_CONTAINERS.try_lock() {
                 Ok(containers) => containers.clone(),
                 Err(_) => {
-                    logging::error("Could not acquire container lock for cleanup");
+                    wrkflw_logging::error("Could not acquire container lock for cleanup");
                     vec![]
                 }
             }
@@ -477,7 +489,7 @@ pub async fn cleanup_containers(docker: &Docker) -> Result<(), String> {
         {
             Ok(containers) => containers,
             Err(_) => {
-                logging::error("Timeout while trying to get containers for cleanup");
+                wrkflw_logging::error("Timeout while trying to get containers for cleanup");
                 vec![]
             }
         };
@@ -486,7 +498,7 @@ pub async fn cleanup_containers(docker: &Docker) -> Result<(), String> {
         return Ok(());
     }
 
-    logging::info(&format!(
+    wrkflw_logging::info(&format!(
         "Cleaning up {} containers",
         containers_to_cleanup.len()
     ));
@@ -500,11 +512,14 @@ pub async fn cleanup_containers(docker: &Docker) -> Result<(), String> {
         )
         .await
         {
-            Ok(Ok(_)) => logging::debug(&format!("Stopped container: {}", container_id)),
-            Ok(Err(e)) => {
-                logging::warning(&format!("Error stopping container {}: {}", container_id, e))
+            Ok(Ok(_)) => wrkflw_logging::debug(&format!("Stopped container: {}", container_id)),
+            Ok(Err(e)) => wrkflw_logging::warning(&format!(
+                "Error stopping container {}: {}",
+                container_id, e
+            )),
+            Err(_) => {
+                wrkflw_logging::warning(&format!("Timeout stopping container: {}", container_id))
             }
-            Err(_) => logging::warning(&format!("Timeout stopping container: {}", container_id)),
         }
 
         // Then try to remove it
@@ -514,11 +529,14 @@ pub async fn cleanup_containers(docker: &Docker) -> Result<(), String> {
         )
         .await
         {
-            Ok(Ok(_)) => logging::debug(&format!("Removed container: {}", container_id)),
-            Ok(Err(e)) => {
-                logging::warning(&format!("Error removing container {}: {}", container_id, e))
+            Ok(Ok(_)) => wrkflw_logging::debug(&format!("Removed container: {}", container_id)),
+            Ok(Err(e)) => wrkflw_logging::warning(&format!(
+                "Error removing container {}: {}",
+                container_id, e
+            )),
+            Err(_) => {
+                wrkflw_logging::warning(&format!("Timeout removing container: {}", container_id))
             }
-            Err(_) => logging::warning(&format!("Timeout removing container: {}", container_id)),
         }
 
         // Always untrack the container whether or not we succeeded to avoid future cleanup attempts
@@ -536,7 +554,7 @@ pub async fn cleanup_networks(docker: &Docker) -> Result<(), String> {
             match CREATED_NETWORKS.try_lock() {
                 Ok(networks) => networks.clone(),
                 Err(_) => {
-                    logging::error("Could not acquire network lock for cleanup");
+                    wrkflw_logging::error("Could not acquire network lock for cleanup");
                     vec![]
                 }
             }
@@ -545,7 +563,7 @@ pub async fn cleanup_networks(docker: &Docker) -> Result<(), String> {
         {
             Ok(networks) => networks,
             Err(_) => {
-                logging::error("Timeout while trying to get networks for cleanup");
+                wrkflw_logging::error("Timeout while trying to get networks for cleanup");
                 vec![]
             }
         };
@@ -554,7 +572,7 @@ pub async fn cleanup_networks(docker: &Docker) -> Result<(), String> {
         return Ok(());
     }
 
-    logging::info(&format!(
+    wrkflw_logging::info(&format!(
         "Cleaning up {} networks",
         networks_to_cleanup.len()
     ));
@@ -566,9 +584,13 @@ pub async fn cleanup_networks(docker: &Docker) -> Result<(), String> {
         )
         .await
         {
-            Ok(Ok(_)) => logging::info(&format!("Successfully removed network: {}", network_id)),
-            Ok(Err(e)) => logging::error(&format!("Error removing network {}: {}", network_id, e)),
-            Err(_) => logging::warning(&format!("Timeout removing network: {}", network_id)),
+            Ok(Ok(_)) => {
+                wrkflw_logging::info(&format!("Successfully removed network: {}", network_id))
+            }
+            Ok(Err(e)) => {
+                wrkflw_logging::error(&format!("Error removing network {}: {}", network_id, e))
+            }
+            Err(_) => wrkflw_logging::warning(&format!("Timeout removing network: {}", network_id)),
         }
 
         // Always untrack the network whether or not we succeeded
@@ -599,7 +621,7 @@ pub async fn create_job_network(docker: &Docker) -> Result<String, ContainerErro
     })?;
 
     track_network(&network_id);
-    logging::info(&format!("Created Docker network: {}", network_id));
+    wrkflw_logging::info(&format!("Created Docker network: {}", network_id));
 
     Ok(network_id)
 }
@@ -615,7 +637,7 @@ impl ContainerRuntime for DockerRuntime {
         volumes: &[(&Path, &Path)],
     ) -> Result<ContainerOutput, ContainerError> {
         // Print detailed debugging info
-        logging::info(&format!("Docker: Running container with image: {}", image));
+        wrkflw_logging::info(&format!("Docker: Running container with image: {}", image));
 
         // Add a global timeout for all Docker operations to prevent freezing
         let timeout_duration = std::time::Duration::from_secs(360); // Increased outer timeout to 6 minutes
@@ -629,7 +651,7 @@ impl ContainerRuntime for DockerRuntime {
         {
             Ok(result) => result,
             Err(_) => {
-                logging::error("Docker operation timed out after 360 seconds");
+                wrkflw_logging::error("Docker operation timed out after 360 seconds");
                 Err(ContainerError::ContainerExecution(
                     "Operation timed out".to_string(),
                 ))
@@ -644,7 +666,7 @@ impl ContainerRuntime for DockerRuntime {
         match tokio::time::timeout(timeout_duration, self.pull_image_inner(image)).await {
             Ok(result) => result,
             Err(_) => {
-                logging::warning(&format!(
+                wrkflw_logging::warning(&format!(
                     "Pull of image {} timed out, continuing with existing image",
                     image
                 ));
@@ -662,7 +684,7 @@ impl ContainerRuntime for DockerRuntime {
         {
             Ok(result) => result,
             Err(_) => {
-                logging::error(&format!(
+                wrkflw_logging::error(&format!(
                     "Building image {} timed out after 120 seconds",
                     tag
                 ));
@@ -836,9 +858,9 @@ impl DockerRuntime {
         // Convert command vector to Vec<String>
         let cmd_vec: Vec<String> = cmd.iter().map(|&s| s.to_string()).collect();
 
-        logging::debug(&format!("Running command in Docker: {:?}", cmd_vec));
-        logging::debug(&format!("Environment: {:?}", env));
-        logging::debug(&format!("Working directory: {}", working_dir.display()));
+        wrkflw_logging::debug(&format!("Running command in Docker: {:?}", cmd_vec));
+        wrkflw_logging::debug(&format!("Environment: {:?}", env));
+        wrkflw_logging::debug(&format!("Working directory: {}", working_dir.display()));
 
         // Determine platform-specific configurations
         let is_windows_image = image.contains("windows")
@@ -973,7 +995,7 @@ impl DockerRuntime {
                 _ => -1,
             },
             Err(_) => {
-                logging::warning("Container wait operation timed out, treating as failure");
+                wrkflw_logging::warning("Container wait operation timed out, treating as failure");
                 -1
             }
         };
@@ -1003,7 +1025,7 @@ impl DockerRuntime {
                 }
             }
         } else {
-            logging::warning("Retrieving container logs timed out");
+            wrkflw_logging::warning("Retrieving container logs timed out");
         }
 
         // Clean up container with a timeout, but preserve on failure if configured
@@ -1016,7 +1038,7 @@ impl DockerRuntime {
             untrack_container(&container.id);
         } else {
             // Container failed and we want to preserve it for debugging
-            logging::info(&format!(
+            wrkflw_logging::info(&format!(
                 "Preserving container {} for debugging (exit code: {}). Use 'docker exec -it {} bash' to inspect.",
                 container.id, exit_code, container.id
             ));
@@ -1026,13 +1048,13 @@ impl DockerRuntime {
 
         // Log detailed information about the command execution for debugging
         if exit_code != 0 {
-            logging::info(&format!(
+            wrkflw_logging::info(&format!(
                 "Docker command failed with exit code: {}",
                 exit_code
             ));
-            logging::debug(&format!("Failed command: {:?}", cmd));
-            logging::debug(&format!("Working directory: {}", working_dir.display()));
-            logging::debug(&format!("STDERR: {}", stderr));
+            wrkflw_logging::debug(&format!("Failed command: {:?}", cmd));
+            wrkflw_logging::debug(&format!("Working directory: {}", working_dir.display()));
+            wrkflw_logging::debug(&format!("STDERR: {}", stderr));
         }
 
         Ok(ContainerOutput {

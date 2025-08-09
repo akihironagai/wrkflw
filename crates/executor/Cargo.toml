@@ -1,18 +1,23 @@
 [package]
-name = "executor"
+name = "wrkflw-executor"
 version.workspace = true
 edition.workspace = true
-description = "Workflow executor for wrkflw"
+description = "Workflow execution engine for wrkflw"
 license.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 # Internal crates
-models = { path = "../models" }
-parser = { path = "../parser" }
-runtime = { path = "../runtime" }
-logging = { path = "../logging" }
-matrix = { path = "../matrix" }
-utils = { path = "../utils" }
+wrkflw-models = { path = "../models", version = "0.5.0" }
+wrkflw-parser = { path = "../parser", version = "0.5.0" }
+wrkflw-runtime = { path = "../runtime", version = "0.5.0" }
+wrkflw-logging = { path = "../logging", version = "0.5.0" }
+wrkflw-matrix = { path = "../matrix", version = "0.5.0" }
+wrkflw-utils = { path = "../utils", version = "0.5.0" }
 
 # External dependencies
 async-trait.workspace = true

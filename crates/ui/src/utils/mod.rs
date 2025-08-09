@@ -1,7 +1,7 @@
 // UI utilities
 use crate::models::{Workflow, WorkflowStatus};
 use std::path::{Path, PathBuf};
-use utils::is_workflow_file;
+use wrkflw_utils::is_workflow_file;
 
 /// Find and load all workflow files in a directory
 pub fn load_workflows(dir_path: &Path) -> Vec<Workflow> {

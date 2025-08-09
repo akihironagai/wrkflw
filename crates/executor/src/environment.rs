@@ -1,8 +1,8 @@
 use chrono::Utc;
-use matrix::MatrixCombination;
-use parser::workflow::WorkflowDefinition;
 use serde_yaml::Value;
 use std::{collections::HashMap, fs, io, path::Path};
+use wrkflw_matrix::MatrixCombination;
+use wrkflw_parser::workflow::WorkflowDefinition;
 
 pub fn setup_github_environment_files(workspace_dir: &Path) -> io::Result<()> {
     // Create necessary directories

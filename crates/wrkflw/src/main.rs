@@ -14,12 +14,12 @@ enum RuntimeChoice {
     Emulation,
 }
 
-impl From<RuntimeChoice> for executor::RuntimeType {
+impl From<RuntimeChoice> for wrkflw_executor::RuntimeType {
     fn from(choice: RuntimeChoice) -> Self {
         match choice {
-            RuntimeChoice::Docker => executor::RuntimeType::Docker,
-            RuntimeChoice::Podman => executor::RuntimeType::Podman,
-            RuntimeChoice::Emulation => executor::RuntimeType::Emulation,
+            RuntimeChoice::Docker => wrkflw_executor::RuntimeType::Docker,
+            RuntimeChoice::Podman => wrkflw_executor::RuntimeType::Podman,
+            RuntimeChoice::Emulation => wrkflw_executor::RuntimeType::Emulation,
         }
     }
 }
@@ -143,7 +143,7 @@ fn parse_key_val(s: &str) -> Result<(String, String), String> {
 }
 
 // Make this function public for testing? Or move to a utils/cleanup mod?
-// Or call executor::cleanup and runtime::cleanup directly?
+// Or call wrkflw_executor::cleanup and wrkflw_runtime::cleanup directly?
 // Let's try calling them directly for now.
 async fn cleanup_on_exit() {
     // Clean up Docker resources if available, but don't let it block indefinitely
@@ -151,35 +151,35 @@ async fn cleanup_on_exit() {
         match Docker::connect_with_local_defaults() {
             Ok(docker) => {
                 // Assuming cleanup_resources exists in executor crate
-                executor::cleanup_resources(&docker).await;
+                wrkflw_executor::cleanup_resources(&docker).await;
             }
             Err(_) => {
                 // Docker not available
-                logging::info("Docker not available, skipping Docker cleanup");
+                wrkflw_logging::info("Docker not available, skipping Docker cleanup");
             }
         }
     })
     .await
     {
-        Ok(_) => logging::debug("Docker cleanup completed successfully"),
-        Err(_) => {
-            logging::warning("Docker cleanup timed out after 3 seconds, continuing with shutdown")
-        }
+        Ok(_) => wrkflw_logging::debug("Docker cleanup completed successfully"),
+        Err(_) => wrkflw_logging::warning(
+            "Docker cleanup timed out after 3 seconds, continuing with shutdown",
+        ),
     }
 
     // Always clean up emulation resources
     match tokio::time::timeout(
         std::time::Duration::from_secs(2),
-        // Assuming cleanup_resources exists in runtime::emulation module
-        runtime::emulation::cleanup_resources(),
+        // Assuming cleanup_resources exists in wrkflw_runtime::emulation module
+        wrkflw_runtime::emulation::cleanup_resources(),
     )
     .await
     {
-        Ok(_) => logging::debug("Emulation cleanup completed successfully"),
-        Err(_) => logging::warning("Emulation cleanup timed out, continuing with shutdown"),
+        Ok(_) => wrkflw_logging::debug("Emulation cleanup completed successfully"),
+        Err(_) => wrkflw_logging::warning("Emulation cleanup timed out, continuing with shutdown"),
     }
 
-    logging::info("Resource cleanup completed");
+    wrkflw_logging::info("Resource cleanup completed");
 }
 
 async fn handle_signals() {
@@ -207,7 +207,7 @@ async fn handle_signals() {
             "Cleanup taking too long (over {} seconds), forcing exit...",
             hard_exit_time.as_secs()
         );
-        logging::error("Forced exit due to cleanup timeout");
+        wrkflw_logging::error("Forced exit due to cleanup timeout");
         std::process::exit(1);
     });
 
@@ -272,13 +272,13 @@ async fn main() {
 
     // Set log level based on command line flags
     if debug {
-        logging::set_log_level(logging::LogLevel::Debug);
-        logging::debug("Debug mode enabled - showing detailed logs");
+        wrkflw_logging::set_log_level(wrkflw_logging::LogLevel::Debug);
+        wrkflw_logging::debug("Debug mode enabled - showing detailed logs");
     } else if verbose {
-        logging::set_log_level(logging::LogLevel::Info);
-        logging::info("Verbose mode enabled");
+        wrkflw_logging::set_log_level(wrkflw_logging::LogLevel::Info);
+        wrkflw_logging::info("Verbose mode enabled");
     } else {
-        logging::set_log_level(logging::LogLevel::Warning);
+        wrkflw_logging::set_log_level(wrkflw_logging::LogLevel::Warning);
     }
 
     // Setup a Ctrl+C handler that runs in the background
@@ -360,7 +360,7 @@ async fn main() {
             gitlab,
         }) => {
             // Create execution configuration
-            let config = executor::ExecutionConfig {
+            let config = wrkflw_executor::ExecutionConfig {
                 runtime_type: runtime.clone().into(),
                 verbose,
                 preserve_containers_on_failure: *preserve_containers_on_failure,
@@ -374,10 +374,10 @@ async fn main() {
                 "GitHub workflow"
             };
 
-            logging::info(&format!("Running {} at: {}", workflow_type, path.display()));
+            wrkflw_logging::info(&format!("Running {} at: {}", workflow_type, path.display()));
 
             // Execute the workflow
-            let result = executor::execute_workflow(path, config)
+            let result = wrkflw_executor::execute_workflow(path, config)
                 .await
                 .unwrap_or_else(|e| {
                     eprintln!("Error executing workflow: {}", e);
@@ -419,15 +419,15 @@ async fn main() {
                         println!(
                             "  {} {} ({})",
                             match job.status {
-                                executor::JobStatus::Success => "✅",
-                                executor::JobStatus::Failure => "❌",
-                                executor::JobStatus::Skipped => "⏭️",
+                                wrkflw_executor::JobStatus::Success => "✅",
+                                wrkflw_executor::JobStatus::Failure => "❌",
+                                wrkflw_executor::JobStatus::Skipped => "⏭️",
                             },
                             job.name,
                             match job.status {
-                                executor::JobStatus::Success => "success",
-                                executor::JobStatus::Failure => "failure",
-                                executor::JobStatus::Skipped => "skipped",
+                                wrkflw_executor::JobStatus::Success => "success",
+                                wrkflw_executor::JobStatus::Failure => "failure",
+                                wrkflw_executor::JobStatus::Skipped => "skipped",
                             }
                         );
 
@@ -435,15 +435,15 @@ async fn main() {
                         println!("  Steps:");
                         for step in job.steps {
                             let step_status = match step.status {
-                                executor::StepStatus::Success => "✅",
-                                executor::StepStatus::Failure => "❌",
-                                executor::StepStatus::Skipped => "⏭️",
+                                wrkflw_executor::StepStatus::Success => "✅",
+                                wrkflw_executor::StepStatus::Failure => "❌",
+                                wrkflw_executor::StepStatus::Skipped => "⏭️",
                             };
 
                             println!("    {} {}", step_status, step.name);
 
                             // If step failed and we're not in verbose mode, show condensed error info
-                            if step.status == executor::StepStatus::Failure && !verbose {
+                            if step.status == wrkflw_executor::StepStatus::Failure && !verbose {
                                 // Extract error information from step output
                                 let error_lines = step
                                     .output
@@ -482,7 +482,7 @@ async fn main() {
                 .map(|v| v.iter().cloned().collect::<HashMap<String, String>>());
 
             // Trigger the pipeline
-            if let Err(e) = gitlab::trigger_pipeline(branch.as_deref(), variables).await {
+            if let Err(e) = wrkflw_gitlab::trigger_pipeline(branch.as_deref(), variables).await {
                 eprintln!("Error triggering GitLab pipeline: {}", e);
                 std::process::exit(1);
             }
@@ -497,7 +497,7 @@ async fn main() {
             let runtime_type = runtime.clone().into();
 
             // Call the TUI implementation from the ui crate
-            if let Err(e) = ui::run_wrkflw_tui(
+            if let Err(e) = wrkflw_ui::run_wrkflw_tui(
                 path.as_ref(),
                 runtime_type,
                 verbose,
@@ -520,7 +520,9 @@ async fn main() {
                 .map(|i| i.iter().cloned().collect::<HashMap<String, String>>());
 
             // Trigger the workflow
-            if let Err(e) = github::trigger_workflow(workflow, branch.as_deref(), inputs).await {
+            if let Err(e) =
+                wrkflw_github::trigger_workflow(workflow, branch.as_deref(), inputs).await
+            {
                 eprintln!("Error triggering GitHub workflow: {}", e);
                 std::process::exit(1);
             }
@@ -530,10 +532,10 @@ async fn main() {
         }
         None => {
             // Launch TUI by default when no command is provided
-            let runtime_type = executor::RuntimeType::Docker;
+            let runtime_type = wrkflw_executor::RuntimeType::Docker;
 
             // Call the TUI implementation from the ui crate with default path
-            if let Err(e) = ui::run_wrkflw_tui(None, runtime_type, verbose, false).await {
+            if let Err(e) = wrkflw_ui::run_wrkflw_tui(None, runtime_type, verbose, false).await {
                 eprintln!("Error running TUI: {}", e);
                 std::process::exit(1);
             }
@@ -547,13 +549,13 @@ fn validate_github_workflow(path: &Path, verbose: bool) -> bool {
     print!("Validating GitHub workflow file: {}... ", path.display());
 
     // Use the ui crate's validate_workflow function
-    match ui::validate_workflow(path, verbose) {
+    match wrkflw_ui::validate_workflow(path, verbose) {
         Ok(_) => {
             // The detailed validation output is already printed by the function
             // We need to check if there were validation issues
-            // Since ui::validate_workflow doesn't return the validation result directly,
+            // Since wrkflw_ui::validate_workflow doesn't return the validation result directly,
             // we need to call the evaluator directly to get the result
-            match evaluator::evaluate_workflow_file(path, verbose) {
+            match wrkflw_evaluator::evaluate_workflow_file(path, verbose) {
                 Ok(result) => !result.is_valid,
                 Err(_) => true, // Parse errors count as validation failure
             }
@@ -571,12 +573,12 @@ fn validate_gitlab_pipeline(path: &Path, verbose: bool) -> bool {
     print!("Validating GitLab CI pipeline file: {}... ", path.display());
 
     // Parse and validate the pipeline file
-    match parser::gitlab::parse_pipeline(path) {
+    match wrkflw_parser::gitlab::parse_pipeline(path) {
         Ok(pipeline) => {
             println!("✅ Valid syntax");
 
             // Additional structural validation
-            let validation_result = validators::validate_gitlab_pipeline(&pipeline);
+            let validation_result = wrkflw_validators::validate_gitlab_pipeline(&pipeline);
 
             if !validation_result.is_valid {
                 println!("⚠️  Validation issues:");

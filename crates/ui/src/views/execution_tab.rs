@@ -145,15 +145,17 @@ pub fn render_execution_tab(
                     .iter()
                     .map(|job| {
                         let status_symbol = match job.status {
-                            executor::JobStatus::Success => "✅",
-                            executor::JobStatus::Failure => "❌",
-                            executor::JobStatus::Skipped => "⏭",
+                            wrkflw_executor::JobStatus::Success => "✅",
+                            wrkflw_executor::JobStatus::Failure => "❌",
+                            wrkflw_executor::JobStatus::Skipped => "⏭",
                         };
 
                         let status_style = match job.status {
-                            executor::JobStatus::Success => Style::default().fg(Color::Green),
-                            executor::JobStatus::Failure => Style::default().fg(Color::Red),
-                            executor::JobStatus::Skipped => Style::default().fg(Color::Gray),
+                            wrkflw_executor::JobStatus::Success => {
+                                Style::default().fg(Color::Green)
+                            }
+                            wrkflw_executor::JobStatus::Failure => Style::default().fg(Color::Red),
+                            wrkflw_executor::JobStatus::Skipped => Style::default().fg(Color::Gray),
                         };
 
                         // Count completed and total steps
@@ -162,8 +164,8 @@ pub fn render_execution_tab(
                             .steps
                             .iter()
                             .filter(|s| {
-                                s.status == executor::StepStatus::Success
-                                    || s.status == executor::StepStatus::Failure
+                                s.status == wrkflw_executor::StepStatus::Success
+                                    || s.status == wrkflw_executor::StepStatus::Failure
                             })
                             .count();
 

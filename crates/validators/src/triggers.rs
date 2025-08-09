@@ -1,5 +1,5 @@
-use models::ValidationResult;
 use serde_yaml::Value;
+use wrkflw_models::ValidationResult;
 
 pub fn validate_triggers(on: &Value, result: &mut ValidationResult) {
     let valid_events = vec![

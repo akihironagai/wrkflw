@@ -1,10 +1,10 @@
 // UI Models for wrkflw
 use chrono::Local;
-use executor::{JobStatus, StepStatus};
 use std::path::PathBuf;
+use wrkflw_executor::{JobStatus, StepStatus};
 
 /// Type alias for the complex execution result type
-pub type ExecutionResultMsg = (usize, Result<(Vec<executor::JobResult>, ()), String>);
+pub type ExecutionResultMsg = (usize, Result<(Vec<wrkflw_executor::JobResult>, ()), String>);
 
 /// Represents an individual workflow file
 pub struct Workflow {

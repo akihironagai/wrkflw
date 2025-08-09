@@ -1,11 +1,11 @@
 use crate::schema::{SchemaType, SchemaValidator};
 use crate::workflow;
-use models::gitlab::Pipeline;
-use models::ValidationResult;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use thiserror::Error;
+use wrkflw_models::gitlab::Pipeline;
+use wrkflw_models::ValidationResult;
 
 #[derive(Error, Debug)]
 pub enum GitlabParserError {
@@ -204,8 +204,8 @@ pub fn convert_to_workflow_format(pipeline: &Pipeline) -> workflow::WorkflowDefi
             for (i, service) in services.iter().enumerate() {
                 let service_name = format!("service-{}", i);
                 let service_image = match service {
-                    models::gitlab::Service::Simple(name) => name.clone(),
-                    models::gitlab::Service::Detailed { name, .. } => name.clone(),
+                    wrkflw_models::gitlab::Service::Simple(name) => name.clone(),
+                    wrkflw_models::gitlab::Service::Detailed { name, .. } => name.clone(),
                 };
 
                 let service = workflow::Service {

@@ -1,14 +1,19 @@
 [package]
-name = "runtime"
+name = "wrkflw-runtime"
 version.workspace = true
 edition.workspace = true
-description = "Runtime environment for wrkflw"
+description = "Runtime execution environment for wrkflw workflow engine"
 license.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 # Internal crates
-models = { path = "../models" }
-logging = { path = "../logging", version = "0.5.0" }
+wrkflw-models = { path = "../models", version = "0.5.0" }
+wrkflw-logging = { path = "../logging", version = "0.5.0" }
 
 # External dependencies
 async-trait.workspace = true
@@ -18,5 +23,5 @@ serde_yaml.workspace = true
 tempfile = "3.9"
 tokio.workspace = true
 futures = "0.3"
-utils = { path = "../utils", version = "0.5.0" }
+wrkflw-utils = { path = "../utils", version = "0.5.0" }
 which = "4.4"

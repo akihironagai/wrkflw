@@ -1,6 +1,6 @@
-use models::gitlab::{Job, Pipeline};
-use models::ValidationResult;
 use std::collections::HashMap;
+use wrkflw_models::gitlab::{Job, Pipeline};
+use wrkflw_models::ValidationResult;
 
 /// Validate a GitLab CI/CD pipeline
 pub fn validate_gitlab_pipeline(pipeline: &Pipeline) -> ValidationResult {
@@ -65,7 +65,7 @@ fn validate_jobs(jobs: &HashMap<String, Job>, result: &mut ValidationResult) {
         // Check retry configuration
         if let Some(retry) = &job.retry {
             match retry {
-                models::gitlab::Retry::MaxAttempts(attempts) => {
+                wrkflw_models::gitlab::Retry::MaxAttempts(attempts) => {
                     if *attempts > 10 {
                         result.add_issue(format!(
                             "Job '{}' has excessive retry count: {}. Consider reducing to avoid resource waste",
@@ -73,7 +73,7 @@ fn validate_jobs(jobs: &HashMap<String, Job>, result: &mut ValidationResult) {
                         ));
                     }
                 }
-                models::gitlab::Retry::Detailed { max, when: _ } => {
+                wrkflw_models::gitlab::Retry::Detailed { max, when: _ } => {
                     if *max > 10 {
                         result.add_issue(format!(
                             "Job '{}' has excessive retry count: {}. Consider reducing to avoid resource waste",

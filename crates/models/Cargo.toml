@@ -1,9 +1,14 @@
 [package]
-name = "models"
+name = "wrkflw-models"
 version.workspace = true
 edition.workspace = true
-description = "Data models for wrkflw"
+description = "Data models and structures for wrkflw workflow execution engine"
 license.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 serde.workspace = true

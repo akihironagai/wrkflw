@@ -1,13 +1,18 @@
 [package]
-name = "logging"
+name = "wrkflw-logging"
 version.workspace = true
 edition.workspace = true
-description = "logging functionality for wrkflw"
+description = "Logging functionality for wrkflw workflow execution engine"
 license.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 # Internal crates
-models = { path = "../models" }
+wrkflw-models = { path = "../models", version = "0.5.0" }
 
 # External dependencies
 chrono.workspace = true

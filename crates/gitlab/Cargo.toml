@@ -1,13 +1,18 @@
 [package]
-name = "gitlab"
+name = "wrkflw-gitlab"
 version.workspace = true
 edition.workspace = true
-description = "gitlab functionality for wrkflw"
+description = "GitLab API integration for wrkflw workflow execution engine"
 license.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 # Internal crates
-models = { path = "../models" }
+wrkflw-models = { path = "../models", version = "0.5.0" }
 
 # External dependencies
 lazy_static.workspace = true

@@ -1,6 +1,5 @@
 use crate::container::{ContainerError, ContainerOutput, ContainerRuntime};
 use async_trait::async_trait;
-use logging;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fs;
@@ -9,6 +8,7 @@ use std::process::Command;
 use std::sync::Mutex;
 use tempfile::TempDir;
 use which;
+use wrkflw_logging;
 
 // Global collection of resources to clean up
 static EMULATION_WORKSPACES: Lazy<Mutex<Vec<PathBuf>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -162,9 +162,9 @@ impl ContainerRuntime for EmulationRuntime {
         }
 
         // Log more detailed debugging information
-        logging::info(&format!("Executing command in container: {}", command_str));
-        logging::info(&format!("Working directory: {}", working_dir.display()));
-        logging::info(&format!("Command length: {}", command.len()));
+        wrkflw_logging::info(&format!("Executing command in container: {}", command_str));
+        wrkflw_logging::info(&format!("Working directory: {}", working_dir.display()));
+        wrkflw_logging::info(&format!("Command length: {}", command.len()));
 
         if command.is_empty() {
             return Err(ContainerError::ContainerExecution(
@@ -174,13 +174,13 @@ impl ContainerRuntime for EmulationRuntime {
 
         // Print each command part separately for debugging
         for (i, part) in command.iter().enumerate() {
-            logging::info(&format!("Command part {}: '{}'", i, part));
+            wrkflw_logging::info(&format!("Command part {}: '{}'", i, part));
         }
 
         // Log environment variables
-        logging::info("Environment variables:");
+        wrkflw_logging::info("Environment variables:");
         for (key, value) in env_vars {
-            logging::info(&format!("  {}={}", key, value));
+            wrkflw_logging::info(&format!("  {}={}", key, value));
         }
 
         // Find actual working directory - determine if we should use the current directory instead
@@ -197,7 +197,7 @@ impl ContainerRuntime for EmulationRuntime {
             // If found, use that as the working directory
             if let Some(path) = workspace_path {
                 if path.exists() {
-                    logging::info(&format!(
+                    wrkflw_logging::info(&format!(
                         "Using environment-defined workspace: {}",
                         path.display()
                     ));
@@ -206,7 +206,7 @@ impl ContainerRuntime for EmulationRuntime {
                     // Fallback to current directory
                     let current_dir =
                         std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                    logging::info(&format!(
+                    wrkflw_logging::info(&format!(
                         "Using current directory: {}",
                         current_dir.display()
                     ));
@@ -215,7 +215,7 @@ impl ContainerRuntime for EmulationRuntime {
             } else {
                 // Fallback to current directory
                 let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                logging::info(&format!(
+                wrkflw_logging::info(&format!(
                     "Using current directory: {}",
                     current_dir.display()
                 ));
@@ -225,7 +225,7 @@ impl ContainerRuntime for EmulationRuntime {
             working_dir.to_path_buf()
         };
 
-        logging::info(&format!(
+        wrkflw_logging::info(&format!(
             "Using actual working directory: {}",
             actual_working_dir.display()
         ));
@@ -233,8 +233,8 @@ impl ContainerRuntime for EmulationRuntime {
         // Check if path contains the command (for shell script execution)
         let command_path = which::which(command[0]);
         match &command_path {
-            Ok(path) => logging::info(&format!("Found command at: {}", path.display())),
-            Err(e) => logging::error(&format!(
+            Ok(path) => wrkflw_logging::info(&format!("Found command at: {}", path.display())),
+            Err(e) => wrkflw_logging::error(&format!(
                 "Command not found in PATH: {} - Error: {}",
                 command[0], e
             )),
@@ -246,7 +246,7 @@ impl ContainerRuntime for EmulationRuntime {
             || command_str.starts_with("mkdir ")
             || command_str.starts_with("mv ")
         {
-            logging::info("Executing as shell command");
+            wrkflw_logging::info("Executing as shell command");
             // Execute as a shell command
             let mut cmd = Command::new("sh");
             cmd.arg("-c");
@@ -264,7 +264,7 @@ impl ContainerRuntime for EmulationRuntime {
                     let output = String::from_utf8_lossy(&output_result.stdout).to_string();
                     let error = String::from_utf8_lossy(&output_result.stderr).to_string();
 
-                    logging::debug(&format!(
+                    wrkflw_logging::debug(&format!(
                         "Shell command completed with exit code: {}",
                         exit_code
                     ));
@@ -314,7 +314,7 @@ impl ContainerRuntime for EmulationRuntime {
 
             // Always use the current directory for cargo/rust commands rather than the temporary directory
             let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            logging::info(&format!(
+            wrkflw_logging::info(&format!(
                 "Using project directory for Rust command: {}",
                 current_dir.display()
             ));
@@ -326,7 +326,7 @@ impl ContainerRuntime for EmulationRuntime {
                 if *key == "CARGO_HOME" && value.contains("${CI_PROJECT_DIR}") {
                     let cargo_home =
                         value.replace("${CI_PROJECT_DIR}", &current_dir.to_string_lossy());
-                    logging::info(&format!("Setting CARGO_HOME to: {}", cargo_home));
+                    wrkflw_logging::info(&format!("Setting CARGO_HOME to: {}", cargo_home));
                     cmd.env(key, cargo_home);
                 } else {
                     cmd.env(key, value);
@@ -338,7 +338,7 @@ impl ContainerRuntime for EmulationRuntime {
                 cmd.args(&parts[1..]);
             }
 
-            logging::debug(&format!(
+            wrkflw_logging::debug(&format!(
                 "Executing Rust command: {} in {}",
                 command_str,
                 current_dir.display()
@@ -350,7 +350,7 @@ impl ContainerRuntime for EmulationRuntime {
                     let output = String::from_utf8_lossy(&output_result.stdout).to_string();
                     let error = String::from_utf8_lossy(&output_result.stderr).to_string();
 
-                    logging::debug(&format!("Command exit code: {}", exit_code));
+                    wrkflw_logging::debug(&format!("Command exit code: {}", exit_code));
 
                     if exit_code != 0 {
                         let mut error_details = format!(
@@ -405,7 +405,7 @@ impl ContainerRuntime for EmulationRuntime {
                 let output = String::from_utf8_lossy(&output_result.stdout).to_string();
                 let error = String::from_utf8_lossy(&output_result.stderr).to_string();
 
-                logging::debug(&format!("Command completed with exit code: {}", exit_code));
+                wrkflw_logging::debug(&format!("Command completed with exit code: {}", exit_code));
 
                 if exit_code != 0 {
                     let mut error_details = format!(
@@ -443,12 +443,12 @@ impl ContainerRuntime for EmulationRuntime {
     }
 
     async fn pull_image(&self, image: &str) -> Result<(), ContainerError> {
-        logging::info(&format!("🔄 Emulation: Pretending to pull image {}", image));
+        wrkflw_logging::info(&format!("🔄 Emulation: Pretending to pull image {}", image));
         Ok(())
     }
 
     async fn build_image(&self, dockerfile: &Path, tag: &str) -> Result<(), ContainerError> {
-        logging::info(&format!(
+        wrkflw_logging::info(&format!(
             "🔄 Emulation: Pretending to build image {} from {}",
             tag,
             dockerfile.display()
@@ -543,14 +543,14 @@ pub async fn handle_special_action(action: &str) -> Result<(), ContainerError> {
         "latest"
     };
 
-    logging::info(&format!(
+    wrkflw_logging::info(&format!(
         "🔄 Processing action: {} @ {}",
         action_name, action_version
     ));
 
     // Handle specific known actions with special requirements
     if action.starts_with("cachix/install-nix-action") {
-        logging::info("🔄 Emulating cachix/install-nix-action");
+        wrkflw_logging::info("🔄 Emulating cachix/install-nix-action");
 
         // In emulation mode, check if nix is installed
         let nix_installed = Command::new("which")
@@ -560,56 +560,56 @@ pub async fn handle_special_action(action: &str) -> Result<(), ContainerError> {
             .unwrap_or(false);
 
         if !nix_installed {
-            logging::info("🔄 Emulation: Nix is required but not installed.");
-            logging::info(
+            wrkflw_logging::info("🔄 Emulation: Nix is required but not installed.");
+            wrkflw_logging::info(
                 "🔄 To use this workflow, please install Nix: https://nixos.org/download.html",
             );
-            logging::info("🔄 Continuing emulation, but nix commands will fail.");
+            wrkflw_logging::info("🔄 Continuing emulation, but nix commands will fail.");
         } else {
-            logging::info("🔄 Emulation: Using system-installed Nix");
+            wrkflw_logging::info("🔄 Emulation: Using system-installed Nix");
         }
     } else if action.starts_with("actions-rs/cargo@") {
         // For actions-rs/cargo action, ensure Rust is available
-        logging::info(&format!("🔄 Detected Rust cargo action: {}", action));
+        wrkflw_logging::info(&format!("🔄 Detected Rust cargo action: {}", action));
 
         // Verify Rust/cargo is installed
         check_command_available("cargo", "Rust/Cargo", "https://rustup.rs/");
     } else if action.starts_with("actions-rs/toolchain@") {
         // For actions-rs/toolchain action, check for Rust installation
-        logging::info(&format!("🔄 Detected Rust toolchain action: {}", action));
+        wrkflw_logging::info(&format!("🔄 Detected Rust toolchain action: {}", action));
 
         check_command_available("rustc", "Rust", "https://rustup.rs/");
     } else if action.starts_with("actions-rs/fmt@") {
         // For actions-rs/fmt action, check if rustfmt is available
-        logging::info(&format!("🔄 Detected Rust formatter action: {}", action));
+        wrkflw_logging::info(&format!("🔄 Detected Rust formatter action: {}", action));
 
         check_command_available("rustfmt", "rustfmt", "rustup component add rustfmt");
     } else if action.starts_with("actions/setup-node@") {
         // Node.js setup action
-        logging::info(&format!("🔄 Detected Node.js setup action: {}", action));
+        wrkflw_logging::info(&format!("🔄 Detected Node.js setup action: {}", action));
 
         check_command_available("node", "Node.js", "https://nodejs.org/");
     } else if action.starts_with("actions/setup-python@") {
         // Python setup action
-        logging::info(&format!("🔄 Detected Python setup action: {}", action));
+        wrkflw_logging::info(&format!("🔄 Detected Python setup action: {}", action));
 
         check_command_available("python", "Python", "https://www.python.org/downloads/");
     } else if action.starts_with("actions/setup-java@") {
         // Java setup action
-        logging::info(&format!("🔄 Detected Java setup action: {}", action));
+        wrkflw_logging::info(&format!("🔄 Detected Java setup action: {}", action));
 
         check_command_available("java", "Java", "https://adoptium.net/");
     } else if action.starts_with("actions/checkout@") {
         // Git checkout action - this is handled implicitly by our workspace setup
-        logging::info("🔄 Detected checkout action - workspace files are already prepared");
+        wrkflw_logging::info("🔄 Detected checkout action - workspace files are already prepared");
     } else if action.starts_with("actions/cache@") {
         // Cache action - can't really emulate caching effectively
-        logging::info(
+        wrkflw_logging::info(
             "🔄 Detected cache action - caching is not fully supported in emulation mode",
         );
     } else {
         // Generic action we don't have special handling for
-        logging::info(&format!(
+        wrkflw_logging::info(&format!(
             "🔄 Action '{}' has no special handling in emulation mode",
             action_name
         ));
@@ -628,12 +628,12 @@ fn check_command_available(command: &str, name: &str, install_url: &str) {
         .unwrap_or(false);
 
     if !is_available {
-        logging::warning(&format!("{} is required but not found on the system", name));
-        logging::info(&format!(
+        wrkflw_logging::warning(&format!("{} is required but not found on the system", name));
+        wrkflw_logging::info(&format!(
             "To use this action, please install {}: {}",
             name, install_url
         ));
-        logging::info(&format!(
+        wrkflw_logging::info(&format!(
             "Continuing emulation, but {} commands will fail",
             name
         ));
@@ -642,7 +642,7 @@ fn check_command_available(command: &str, name: &str, install_url: &str) {
         if let Ok(output) = Command::new(command).arg("--version").output() {
             if output.status.success() {
                 let version = String::from_utf8_lossy(&output.stdout);
-                logging::info(&format!("🔄 Using system {}: {}", name, version.trim()));
+                wrkflw_logging::info(&format!("🔄 Using system {}: {}", name, version.trim()));
             }
         }
     }
@@ -708,7 +708,7 @@ async fn cleanup_processes() {
     };
 
     for pid in processes_to_cleanup {
-        logging::info(&format!("Cleaning up emulated process: {}", pid));
+        wrkflw_logging::info(&format!("Cleaning up emulated process: {}", pid));
 
         #[cfg(unix)]
         {
@@ -747,7 +747,7 @@ async fn cleanup_workspaces() {
     };
 
     for workspace_path in workspaces_to_cleanup {
-        logging::info(&format!(
+        wrkflw_logging::info(&format!(
             "Cleaning up emulation workspace: {}",
             workspace_path.display()
         ));
@@ -755,8 +755,8 @@ async fn cleanup_workspaces() {
         // Only attempt to remove if it exists
         if workspace_path.exists() {
             match fs::remove_dir_all(&workspace_path) {
-                Ok(_) => logging::info("Successfully removed workspace directory"),
-                Err(e) => logging::error(&format!("Error removing workspace: {}", e)),
+                Ok(_) => wrkflw_logging::info("Successfully removed workspace directory"),
+                Err(e) => wrkflw_logging::error(&format!("Error removing workspace: {}", e)),
             }
         }
 

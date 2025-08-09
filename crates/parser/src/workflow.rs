@@ -1,8 +1,8 @@
-use matrix::MatrixConfig;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use wrkflw_matrix::MatrixConfig;
 
 use super::schema::SchemaValidator;
 

@@ -1,13 +1,18 @@
 [package]
-name = "matrix"
+name = "wrkflw-matrix"
 version.workspace = true
 edition.workspace = true
-description = "matrix functionality for wrkflw"
+description = "Matrix job parallelization for wrkflw workflow execution engine"
 license.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 # Internal crates
-models = { path = "../models" }
+wrkflw-models = { path = "../models", version = "0.5.0" }
 
 # External dependencies
 indexmap.workspace = true

@@ -1,6 +1,5 @@
 // Status bar rendering
 use crate::app::App;
-use executor::RuntimeType;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Alignment, Rect},
@@ -10,6 +9,7 @@ use ratatui::{
     Frame,
 };
 use std::io;
+use wrkflw_executor::RuntimeType;
 
 // Render the status bar
 pub fn render_status_bar(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App, area: Rect) {
@@ -50,16 +50,17 @@ pub fn render_status_bar(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App,
     match app.runtime_type {
         RuntimeType::Docker => {
             // Check Docker silently using safe FD redirection
-            let is_docker_available =
-                match utils::fd::with_stderr_to_null(executor::docker::is_available) {
-                    Ok(result) => result,
-                    Err(_) => {
-                        logging::debug(
-                            "Failed to redirect stderr when checking Docker availability.",
-                        );
-                        false
-                    }
-                };
+            let is_docker_available = match wrkflw_utils::fd::with_stderr_to_null(
+                wrkflw_executor::docker::is_available,
+            ) {
+                Ok(result) => result,
+                Err(_) => {
+                    wrkflw_logging::debug(
+                        "Failed to redirect stderr when checking Docker availability.",
+                    );
+                    false
+                }
+            };
 
             status_items.push(Span::raw(" "));
             status_items.push(Span::styled(
@@ -79,16 +80,17 @@ pub fn render_status_bar(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App,
         }
         RuntimeType::Podman => {
             // Check Podman silently using safe FD redirection
-            let is_podman_available =
-                match utils::fd::with_stderr_to_null(executor::podman::is_available) {
-                    Ok(result) => result,
-                    Err(_) => {
-                        logging::debug(
-                            "Failed to redirect stderr when checking Podman availability.",
-                        );
-                        false
-                    }
-                };
+            let is_podman_available = match wrkflw_utils::fd::with_stderr_to_null(
+                wrkflw_executor::podman::is_available,
+            ) {
+                Ok(result) => result,
+                Err(_) => {
+                    wrkflw_logging::debug(
+                        "Failed to redirect stderr when checking Podman availability.",
+                    );
+                    false
+                }
+            };
 
             status_items.push(Span::raw(" "));
             status_items.push(Span::styled(
@@ -159,7 +161,7 @@ pub fn render_status_bar(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App,
         }
         2 => {
             // For logs tab, show scrolling instructions
-            let log_count = app.logs.len() + logging::get_logs().len();
+            let log_count = app.logs.len() + wrkflw_logging::get_logs().len();
             if log_count > 0 {
                 // Convert to a static string for consistent return type
                 let scroll_text = format!(

@@ -13,13 +13,13 @@ use crate::dependency;
 use crate::docker;
 use crate::environment;
 use crate::podman;
-use logging;
-use matrix::MatrixCombination;
-use models::gitlab::Pipeline;
-use parser::gitlab::{self, parse_pipeline};
-use parser::workflow::{self, parse_workflow, ActionInfo, Job, WorkflowDefinition};
-use runtime::container::ContainerRuntime;
-use runtime::emulation;
+use wrkflw_logging;
+use wrkflw_matrix::MatrixCombination;
+use wrkflw_models::gitlab::Pipeline;
+use wrkflw_parser::gitlab::{self, parse_pipeline};
+use wrkflw_parser::workflow::{self, parse_workflow, ActionInfo, Job, WorkflowDefinition};
+use wrkflw_runtime::container::ContainerRuntime;
+use wrkflw_runtime::emulation;
 
 #[allow(unused_variables, unused_assignments)]
 /// Execute a GitHub Actions workflow file locally
@@ -27,8 +27,8 @@ pub async fn execute_workflow(
     workflow_path: &Path,
     config: ExecutionConfig,
 ) -> Result<ExecutionResult, ExecutionError> {
-    logging::info(&format!("Executing workflow: {}", workflow_path.display()));
-    logging::info(&format!("Runtime: {:?}", config.runtime_type));
+    wrkflw_logging::info(&format!("Executing workflow: {}", workflow_path.display()));
+    wrkflw_logging::info(&format!("Runtime: {:?}", config.runtime_type));
 
     // Determine if this is a GitLab CI/CD pipeline or GitHub Actions workflow
     let is_gitlab = is_gitlab_pipeline(workflow_path);
@@ -150,7 +150,7 @@ async fn execute_github_workflow(
 
     // If there were failures, add detailed failure information to the result
     if has_failures {
-        logging::error(&format!("Workflow execution failed:{}", failure_details));
+        wrkflw_logging::error(&format!("Workflow execution failed:{}", failure_details));
     }
 
     Ok(ExecutionResult {
@@ -168,7 +168,7 @@ async fn execute_gitlab_pipeline(
     pipeline_path: &Path,
     config: ExecutionConfig,
 ) -> Result<ExecutionResult, ExecutionError> {
-    logging::info("Executing GitLab CI/CD pipeline");
+    wrkflw_logging::info("Executing GitLab CI/CD pipeline");
 
     // 1. Parse the GitLab pipeline file
     let pipeline = parse_pipeline(pipeline_path)
@@ -244,7 +244,7 @@ async fn execute_gitlab_pipeline(
 
     // If there were failures, add detailed failure information to the result
     if has_failures {
-        logging::error(&format!("Pipeline execution failed:{}", failure_details));
+        wrkflw_logging::error(&format!("Pipeline execution failed:{}", failure_details));
     }
 
     Ok(ExecutionResult {
@@ -369,7 +369,7 @@ fn initialize_runtime(
                 match docker::DockerRuntime::new_with_config(preserve_containers_on_failure) {
                     Ok(docker_runtime) => Ok(Box::new(docker_runtime)),
                     Err(e) => {
-                        logging::error(&format!(
+                        wrkflw_logging::error(&format!(
                             "Failed to initialize Docker runtime: {}, falling back to emulation mode",
                             e
                         ));
@@ -377,7 +377,7 @@ fn initialize_runtime(
                     }
                 }
             } else {
-                logging::error("Docker not available, falling back to emulation mode");
+                wrkflw_logging::error("Docker not available, falling back to emulation mode");
                 Ok(Box::new(emulation::EmulationRuntime::new()))
             }
         }
@@ -387,7 +387,7 @@ fn initialize_runtime(
                 match podman::PodmanRuntime::new_with_config(preserve_containers_on_failure) {
                     Ok(podman_runtime) => Ok(Box::new(podman_runtime)),
                     Err(e) => {
-                        logging::error(&format!(
+                        wrkflw_logging::error(&format!(
                             "Failed to initialize Podman runtime: {}, falling back to emulation mode",
                             e
                         ));
@@ -395,7 +395,7 @@ fn initialize_runtime(
                     }
                 }
             } else {
-                logging::error("Podman not available, falling back to emulation mode");
+                wrkflw_logging::error("Podman not available, falling back to emulation mode");
                 Ok(Box::new(emulation::EmulationRuntime::new()))
             }
         }
@@ -577,7 +577,7 @@ async fn execute_job_with_matrix(
     if let Some(if_condition) = &job.if_condition {
         let should_run = evaluate_job_condition(if_condition, env_context, workflow);
         if !should_run {
-            logging::info(&format!(
+            wrkflw_logging::info(&format!(
                 "⏭️ Skipping job '{}' due to condition: {}",
                 job_name, if_condition
             ));
@@ -594,11 +594,11 @@ async fn execute_job_with_matrix(
     // Check if this is a matrix job
     if let Some(matrix_config) = &job.matrix {
         // Expand the matrix into combinations
-        let combinations = matrix::expand_matrix(matrix_config)
+        let combinations = wrkflw_matrix::expand_matrix(matrix_config)
             .map_err(|e| ExecutionError::Execution(format!("Failed to expand matrix: {}", e)))?;
 
         if combinations.is_empty() {
-            logging::info(&format!(
+            wrkflw_logging::info(&format!(
                 "Matrix job '{}' has no valid combinations",
                 job_name
             ));
@@ -606,7 +606,7 @@ async fn execute_job_with_matrix(
             return Ok(Vec::new());
         }
 
-        logging::info(&format!(
+        wrkflw_logging::info(&format!(
             "Matrix job '{}' expanded to {} combinations",
             job_name,
             combinations.len()
@@ -674,13 +674,13 @@ async fn execute_job(ctx: JobExecutionContext<'_>) -> Result<JobResult, Executio
     })?;
 
     // Copy project files to the job workspace directory
-    logging::info(&format!(
+    wrkflw_logging::info(&format!(
         "Copying project files to job workspace: {}",
         job_dir.path().display()
     ));
     copy_directory_contents(&current_dir, job_dir.path())?;
 
-    logging::info(&format!("Executing job: {}", ctx.job_name));
+    wrkflw_logging::info(&format!("Executing job: {}", ctx.job_name));
 
     let mut job_success = true;
 
@@ -780,7 +780,8 @@ async fn execute_matrix_combinations(
         if ctx.fail_fast && any_failed {
             // Add skipped results for remaining combinations
             for combination in chunk {
-                let combination_name = matrix::format_combination_name(ctx.job_name, combination);
+                let combination_name =
+                    wrkflw_matrix::format_combination_name(ctx.job_name, combination);
                 results.push(JobResult {
                     name: combination_name,
                     status: JobStatus::Skipped,
@@ -818,7 +819,7 @@ async fn execute_matrix_combinations(
                 Err(e) => {
                     // On error, mark as failed and continue if not fail-fast
                     any_failed = true;
-                    logging::error(&format!("Matrix job failed: {}", e));
+                    wrkflw_logging::error(&format!("Matrix job failed: {}", e));
 
                     if ctx.fail_fast {
                         return Err(e);
@@ -842,9 +843,9 @@ async fn execute_matrix_job(
     verbose: bool,
 ) -> Result<JobResult, ExecutionError> {
     // Create the matrix-specific job name
-    let matrix_job_name = matrix::format_combination_name(job_name, combination);
+    let matrix_job_name = wrkflw_matrix::format_combination_name(job_name, combination);
 
-    logging::info(&format!("Executing matrix job: {}", matrix_job_name));
+    wrkflw_logging::info(&format!("Executing matrix job: {}", matrix_job_name));
 
     // Clone the environment and add matrix-specific values
     let mut job_env = base_env_context.clone();
@@ -870,14 +871,14 @@ async fn execute_matrix_job(
     })?;
 
     // Copy project files to the job workspace directory
-    logging::info(&format!(
+    wrkflw_logging::info(&format!(
         "Copying project files to job workspace: {}",
         job_dir.path().display()
     ));
     copy_directory_contents(&current_dir, job_dir.path())?;
 
     let job_success = if job_template.steps.is_empty() {
-        logging::warning(&format!("Job '{}' has no steps", matrix_job_name));
+        wrkflw_logging::warning(&format!("Job '{}' has no steps", matrix_job_name));
         true
     } else {
         // Execute each step
@@ -971,7 +972,7 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
         .unwrap_or_else(|| format!("Step {}", ctx.step_idx + 1));
 
     if ctx.verbose {
-        logging::info(&format!("  Executing step: {}", step_name));
+        wrkflw_logging::info(&format!("  Executing step: {}", step_name));
     }
 
     // Prepare step environment
@@ -1073,7 +1074,9 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
 
                 // Special handling for Rust actions
                 if uses.starts_with("actions-rs/") {
-                    logging::info("🔄 Detected Rust action - using system Rust installation");
+                    wrkflw_logging::info(
+                        "🔄 Detected Rust action - using system Rust installation",
+                    );
 
                     // For toolchain action, verify Rust is installed
                     if uses.starts_with("actions-rs/toolchain@") {
@@ -1083,7 +1086,10 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                             .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
                             .unwrap_or_else(|_| "not found".to_string());
 
-                        logging::info(&format!("🔄 Using system Rust: {}", rustc_version.trim()));
+                        wrkflw_logging::info(&format!(
+                            "🔄 Using system Rust: {}",
+                            rustc_version.trim()
+                        ));
 
                         // Return success since we're using system Rust
                         return Ok(StepResult {
@@ -1101,7 +1107,7 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                             .map(|output| String::from_utf8_lossy(&output.stdout).to_string())
                             .unwrap_or_else(|_| "not found".to_string());
 
-                        logging::info(&format!(
+                        wrkflw_logging::info(&format!(
                             "🔄 Using system Rust/Cargo: {}",
                             cargo_version.trim()
                         ));
@@ -1109,7 +1115,10 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                         // Get the command from the 'with' parameters
                         if let Some(with_params) = &ctx.step.with {
                             if let Some(command) = with_params.get("command") {
-                                logging::info(&format!("🔄 Found command parameter: {}", command));
+                                wrkflw_logging::info(&format!(
+                                    "🔄 Found command parameter: {}",
+                                    command
+                                ));
 
                                 // Build the actual command
                                 let mut real_command = format!("cargo {}", command);
@@ -1119,7 +1128,7 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                                     if !args.is_empty() {
                                         // Resolve GitHub-style variables in args
                                         let resolved_args = if args.contains("${{") {
-                                            logging::info(&format!(
+                                            wrkflw_logging::info(&format!(
                                                 "🔄 Resolving workflow variables in: {}",
                                                 args
                                             ));
@@ -1133,7 +1142,7 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                                             let re_pattern =
                                                 regex::Regex::new(r"\$\{\{\s*([^}]+)\s*\}\}")
                                                     .unwrap_or_else(|_| {
-                                                        logging::error(
+                                                        wrkflw_logging::error(
                                                             "Failed to create regex pattern",
                                                         );
                                                         regex::Regex::new(r"\$\{\{.*?\}\}").unwrap()
@@ -1141,7 +1150,10 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
 
                                             let resolved =
                                                 re_pattern.replace_all(&resolved, "").to_string();
-                                            logging::info(&format!("🔄 Resolved to: {}", resolved));
+                                            wrkflw_logging::info(&format!(
+                                                "🔄 Resolved to: {}",
+                                                resolved
+                                            ));
 
                                             resolved.trim().to_string()
                                         } else {
@@ -1157,7 +1169,7 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                                     }
                                 }
 
-                                logging::info(&format!(
+                                wrkflw_logging::info(&format!(
                                     "🔄 Running actual command: {}",
                                     real_command
                                 ));
@@ -1239,13 +1251,13 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                         .cloned()
                         .unwrap_or_else(|| "not set".to_string());
 
-                    logging::debug(&format!(
+                    wrkflw_logging::debug(&format!(
                         "WRKFLW_HIDE_ACTION_MESSAGES value: {}",
                         hide_action_value
                     ));
 
                     let hide_messages = hide_action_value == "true";
-                    logging::debug(&format!("Should hide messages: {}", hide_messages));
+                    wrkflw_logging::debug(&format!("Should hide messages: {}", hide_messages));
 
                     // Only log a message to the console if we're showing action messages
                     if !hide_messages {
@@ -1262,7 +1274,10 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                         // Common GitHub action pattern: has a 'command' parameter
                         if let Some(cmd) = with_params.get("command") {
                             if ctx.verbose {
-                                logging::info(&format!("🔄 Found command parameter: {}", cmd));
+                                wrkflw_logging::info(&format!(
+                                    "🔄 Found command parameter: {}",
+                                    cmd
+                                ));
                             }
 
                             // Convert to real command based on action type patterns
@@ -1302,7 +1317,7 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                                 if !args.is_empty() {
                                     // Resolve GitHub-style variables in args
                                     let resolved_args = if args.contains("${{") {
-                                        logging::info(&format!(
+                                        wrkflw_logging::info(&format!(
                                             "🔄 Resolving workflow variables in: {}",
                                             args
                                         ));
@@ -1315,7 +1330,7 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                                         let re_pattern =
                                             regex::Regex::new(r"\$\{\{\s*([^}]+)\s*\}\}")
                                                 .unwrap_or_else(|_| {
-                                                    logging::error(
+                                                    wrkflw_logging::error(
                                                         "Failed to create regex pattern",
                                                     );
                                                     regex::Regex::new(r"\$\{\{.*?\}\}").unwrap()
@@ -1323,7 +1338,10 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
 
                                         let resolved =
                                             re_pattern.replace_all(&resolved, "").to_string();
-                                        logging::info(&format!("🔄 Resolved to: {}", resolved));
+                                        wrkflw_logging::info(&format!(
+                                            "🔄 Resolved to: {}",
+                                            resolved
+                                        ));
 
                                         resolved.trim().to_string()
                                     } else {
@@ -1342,7 +1360,10 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                     if should_run_real_command && !real_command_parts.is_empty() {
                         // Build a final command string
                         let command_str = real_command_parts.join(" ");
-                        logging::info(&format!("🔄 Running actual command: {}", command_str));
+                        wrkflw_logging::info(&format!(
+                            "🔄 Running actual command: {}",
+                            command_str
+                        ));
 
                         // Replace the emulated command with a shell command to execute our command
                         cmd.clear();
@@ -1737,7 +1758,7 @@ async fn prepare_runner_image(
 ) -> Result<(), ExecutionError> {
     // Try to pull the image first
     if let Err(e) = runtime.pull_image(image).await {
-        logging::warning(&format!("Failed to pull image {}: {}", image, e));
+        wrkflw_logging::warning(&format!("Failed to pull image {}: {}", image, e));
     }
 
     // Check if this is a language-specific runner
@@ -1750,7 +1771,7 @@ async fn prepare_runner_image(
             .map_err(|e| ExecutionError::Runtime(e.to_string()))
         {
             if verbose {
-                logging::info(&format!("Using customized image: {}", custom_image));
+                wrkflw_logging::info(&format!("Using customized image: {}", custom_image));
             }
             return Ok(());
         }
@@ -2028,7 +2049,7 @@ fn evaluate_job_condition(
     env_context: &HashMap<String, String>,
     workflow: &WorkflowDefinition,
 ) -> bool {
-    logging::debug(&format!("Evaluating condition: {}", condition));
+    wrkflw_logging::debug(&format!("Evaluating condition: {}", condition));
 
     // For now, implement basic pattern matching for common conditions
     // TODO: Implement a full GitHub Actions expression evaluator
@@ -2051,14 +2072,14 @@ fn evaluate_job_condition(
     if condition.contains("needs.") && condition.contains(".outputs.") {
         // For now, simulate that outputs are available but empty
         // This means conditions like needs.changes.outputs.source-code == 'true' will be false
-        logging::debug(
+        wrkflw_logging::debug(
             "Evaluating needs.outputs condition - defaulting to false for local execution",
         );
         return false;
     }
 
     // Default to true for unknown conditions to avoid breaking workflows
-    logging::warning(&format!(
+    wrkflw_logging::warning(&format!(
         "Unknown condition pattern: '{}' - defaulting to true",
         condition
     ));

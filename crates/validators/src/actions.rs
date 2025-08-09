@@ -1,4 +1,4 @@
-use models::ValidationResult;
+use wrkflw_models::ValidationResult;
 
 pub fn validate_action_reference(
     action_ref: &str,

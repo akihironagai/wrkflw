@@ -46,15 +46,15 @@ pub fn render_job_detail_view(
 
                     // Job title section
                     let status_text = match job.status {
-                        executor::JobStatus::Success => "Success",
-                        executor::JobStatus::Failure => "Failed",
-                        executor::JobStatus::Skipped => "Skipped",
+                        wrkflw_executor::JobStatus::Success => "Success",
+                        wrkflw_executor::JobStatus::Failure => "Failed",
+                        wrkflw_executor::JobStatus::Skipped => "Skipped",
                     };
 
                     let status_style = match job.status {
-                        executor::JobStatus::Success => Style::default().fg(Color::Green),
-                        executor::JobStatus::Failure => Style::default().fg(Color::Red),
-                        executor::JobStatus::Skipped => Style::default().fg(Color::Yellow),
+                        wrkflw_executor::JobStatus::Success => Style::default().fg(Color::Green),
+                        wrkflw_executor::JobStatus::Failure => Style::default().fg(Color::Red),
+                        wrkflw_executor::JobStatus::Skipped => Style::default().fg(Color::Yellow),
                     };
 
                     let job_title = Paragraph::new(vec![
@@ -101,15 +101,19 @@ pub fn render_job_detail_view(
 
                     let rows = job.steps.iter().map(|step| {
                         let status_symbol = match step.status {
-                            executor::StepStatus::Success => "✅",
-                            executor::StepStatus::Failure => "❌",
-                            executor::StepStatus::Skipped => "⏭",
+                            wrkflw_executor::StepStatus::Success => "✅",
+                            wrkflw_executor::StepStatus::Failure => "❌",
+                            wrkflw_executor::StepStatus::Skipped => "⏭",
                         };
 
                         let status_style = match step.status {
-                            executor::StepStatus::Success => Style::default().fg(Color::Green),
-                            executor::StepStatus::Failure => Style::default().fg(Color::Red),
-                            executor::StepStatus::Skipped => Style::default().fg(Color::Gray),
+                            wrkflw_executor::StepStatus::Success => {
+                                Style::default().fg(Color::Green)
+                            }
+                            wrkflw_executor::StepStatus::Failure => Style::default().fg(Color::Red),
+                            wrkflw_executor::StepStatus::Skipped => {
+                                Style::default().fg(Color::Gray)
+                            }
                         };
 
                         Row::new(vec![
@@ -147,15 +151,21 @@ pub fn render_job_detail_view(
 
                             // Show step output with proper styling
                             let status_text = match step.status {
-                                executor::StepStatus::Success => "Success",
-                                executor::StepStatus::Failure => "Failed",
-                                executor::StepStatus::Skipped => "Skipped",
+                                wrkflw_executor::StepStatus::Success => "Success",
+                                wrkflw_executor::StepStatus::Failure => "Failed",
+                                wrkflw_executor::StepStatus::Skipped => "Skipped",
                             };
 
                             let status_style = match step.status {
-                                executor::StepStatus::Success => Style::default().fg(Color::Green),
-                                executor::StepStatus::Failure => Style::default().fg(Color::Red),
-                                executor::StepStatus::Skipped => Style::default().fg(Color::Yellow),
+                                wrkflw_executor::StepStatus::Success => {
+                                    Style::default().fg(Color::Green)
+                                }
+                                wrkflw_executor::StepStatus::Failure => {
+                                    Style::default().fg(Color::Red)
+                                }
+                                wrkflw_executor::StepStatus::Skipped => {
+                                    Style::default().fg(Color::Yellow)
+                                }
                             };
 
                             let mut output_text = step.output.clone();

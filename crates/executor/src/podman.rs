@@ -1,15 +1,15 @@
 use async_trait::async_trait;
-use logging;
 use once_cell::sync::Lazy;
-use runtime::container::{ContainerError, ContainerOutput, ContainerRuntime};
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Mutex;
 use tempfile;
 use tokio::process::Command;
-use utils;
-use utils::fd;
+use wrkflw_logging;
+use wrkflw_runtime::container::{ContainerError, ContainerOutput, ContainerRuntime};
+use wrkflw_utils;
+use wrkflw_utils::fd;
 
 static RUNNING_CONTAINERS: Lazy<Mutex<Vec<String>>> = Lazy::new(|| Mutex::new(Vec::new()));
 // Map to track customized images for a job
@@ -46,7 +46,7 @@ impl PodmanRuntime {
         match CUSTOMIZED_IMAGES.lock() {
             Ok(images) => images.get(&key).cloned(),
             Err(e) => {
-                logging::error(&format!("Failed to acquire lock: {}", e));
+                wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
                 None
             }
         }
@@ -58,7 +58,7 @@ impl PodmanRuntime {
         if let Err(e) = CUSTOMIZED_IMAGES.lock().map(|mut images| {
             images.insert(key, new_image.to_string());
         }) {
-            logging::error(&format!("Failed to acquire lock: {}", e));
+            wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
         }
     }
 
@@ -68,7 +68,7 @@ impl PodmanRuntime {
         let image_keys = match CUSTOMIZED_IMAGES.lock() {
             Ok(keys) => keys,
             Err(e) => {
-                logging::error(&format!("Failed to acquire lock: {}", e));
+                wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
                 return None;
             }
         };
@@ -103,7 +103,7 @@ impl PodmanRuntime {
         match CUSTOMIZED_IMAGES.lock() {
             Ok(images) => images.get(&key).cloned(),
             Err(e) => {
-                logging::error(&format!("Failed to acquire lock: {}", e));
+                wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
                 None
             }
         }
@@ -130,7 +130,7 @@ impl PodmanRuntime {
         if let Err(e) = CUSTOMIZED_IMAGES.lock().map(|mut images| {
             images.insert(key, new_image.to_string());
         }) {
-            logging::error(&format!("Failed to acquire lock: {}", e));
+            wrkflw_logging::error(&format!("Failed to acquire lock: {}", e));
         }
     }
 
@@ -151,7 +151,7 @@ impl PodmanRuntime {
             }
             cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-            logging::debug(&format!(
+            wrkflw_logging::debug(&format!(
                 "Running Podman command: podman {}",
                 args.join(" ")
             ));
@@ -192,7 +192,7 @@ impl PodmanRuntime {
         match result {
             Ok(output) => output,
             Err(_) => {
-                logging::error("Podman operation timed out after 360 seconds");
+                wrkflw_logging::error("Podman operation timed out after 360 seconds");
                 Err(ContainerError::ContainerExecution(
                     "Operation timed out".to_string(),
                 ))
@@ -244,7 +244,7 @@ pub fn is_available() -> bool {
                         }
                     }
                     Err(_) => {
-                        logging::debug("Podman CLI is not available");
+                        wrkflw_logging::debug("Podman CLI is not available");
                         return false;
                     }
                 }
@@ -257,7 +257,7 @@ pub fn is_available() -> bool {
             {
                 Ok(rt) => rt,
                 Err(e) => {
-                    logging::error(&format!(
+                    wrkflw_logging::error(&format!(
                         "Failed to create runtime for Podman availability check: {}",
                         e
                     ));
@@ -278,16 +278,16 @@ pub fn is_available() -> bool {
                             if output.status.success() {
                                 true
                             } else {
-                                logging::debug("Podman info command failed");
+                                wrkflw_logging::debug("Podman info command failed");
                                 false
                             }
                         }
                         Ok(Err(e)) => {
-                            logging::debug(&format!("Podman info command error: {}", e));
+                            wrkflw_logging::debug(&format!("Podman info command error: {}", e));
                             false
                         }
                         Err(_) => {
-                            logging::debug("Podman info command timed out after 1 second");
+                            wrkflw_logging::debug("Podman info command timed out after 1 second");
                             false
                         }
                     }
@@ -296,7 +296,7 @@ pub fn is_available() -> bool {
                 {
                     Ok(result) => result,
                     Err(_) => {
-                        logging::debug("Podman availability check timed out");
+                        wrkflw_logging::debug("Podman availability check timed out");
                         false
                     }
                 }
@@ -304,7 +304,9 @@ pub fn is_available() -> bool {
         }) {
             Ok(result) => result,
             Err(_) => {
-                logging::debug("Failed to redirect stderr when checking Podman availability");
+                wrkflw_logging::debug(
+                    "Failed to redirect stderr when checking Podman availability",
+                );
                 false
             }
         }
@@ -318,7 +320,7 @@ pub fn is_available() -> bool {
             return match handle.join() {
                 Ok(result) => result,
                 Err(_) => {
-                    logging::warning("Podman availability check thread panicked");
+                    wrkflw_logging::warning("Podman availability check thread panicked");
                     false
                 }
             };
@@ -326,7 +328,9 @@ pub fn is_available() -> bool {
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
-    logging::warning("Podman availability check timed out, assuming Podman is not available");
+    wrkflw_logging::warning(
+        "Podman availability check timed out, assuming Podman is not available",
+    );
     false
 }
 
@@ -352,12 +356,12 @@ pub async fn cleanup_resources() {
     match tokio::time::timeout(cleanup_timeout, cleanup_containers()).await {
         Ok(result) => {
             if let Err(e) = result {
-                logging::error(&format!("Error during container cleanup: {}", e));
+                wrkflw_logging::error(&format!("Error during container cleanup: {}", e));
             }
         }
-        Err(_) => {
-            logging::warning("Podman cleanup timed out, some resources may not have been removed")
-        }
+        Err(_) => wrkflw_logging::warning(
+            "Podman cleanup timed out, some resources may not have been removed",
+        ),
     }
 }
 
@@ -369,7 +373,7 @@ pub async fn cleanup_containers() -> Result<(), String> {
             match RUNNING_CONTAINERS.try_lock() {
                 Ok(containers) => containers.clone(),
                 Err(_) => {
-                    logging::error("Could not acquire container lock for cleanup");
+                    wrkflw_logging::error("Could not acquire container lock for cleanup");
                     vec![]
                 }
             }
@@ -378,7 +382,7 @@ pub async fn cleanup_containers() -> Result<(), String> {
         {
             Ok(containers) => containers,
             Err(_) => {
-                logging::error("Timeout while trying to get containers for cleanup");
+                wrkflw_logging::error("Timeout while trying to get containers for cleanup");
                 vec![]
             }
         };
@@ -387,7 +391,7 @@ pub async fn cleanup_containers() -> Result<(), String> {
         return Ok(());
     }
 
-    logging::info(&format!(
+    wrkflw_logging::info(&format!(
         "Cleaning up {} containers",
         containers_to_cleanup.len()
     ));
@@ -408,15 +412,18 @@ pub async fn cleanup_containers() -> Result<(), String> {
         match stop_result {
             Ok(Ok(output)) => {
                 if output.status.success() {
-                    logging::debug(&format!("Stopped container: {}", container_id));
+                    wrkflw_logging::debug(&format!("Stopped container: {}", container_id));
                 } else {
-                    logging::warning(&format!("Error stopping container {}", container_id));
+                    wrkflw_logging::warning(&format!("Error stopping container {}", container_id));
                 }
             }
-            Ok(Err(e)) => {
-                logging::warning(&format!("Error stopping container {}: {}", container_id, e))
+            Ok(Err(e)) => wrkflw_logging::warning(&format!(
+                "Error stopping container {}: {}",
+                container_id, e
+            )),
+            Err(_) => {
+                wrkflw_logging::warning(&format!("Timeout stopping container: {}", container_id))
             }
-            Err(_) => logging::warning(&format!("Timeout stopping container: {}", container_id)),
         }
 
         // Then try to remove it
@@ -433,15 +440,18 @@ pub async fn cleanup_containers() -> Result<(), String> {
         match remove_result {
             Ok(Ok(output)) => {
                 if output.status.success() {
-                    logging::debug(&format!("Removed container: {}", container_id));
+                    wrkflw_logging::debug(&format!("Removed container: {}", container_id));
                 } else {
-                    logging::warning(&format!("Error removing container {}", container_id));
+                    wrkflw_logging::warning(&format!("Error removing container {}", container_id));
                 }
             }
-            Ok(Err(e)) => {
-                logging::warning(&format!("Error removing container {}: {}", container_id, e))
+            Ok(Err(e)) => wrkflw_logging::warning(&format!(
+                "Error removing container {}: {}",
+                container_id, e
+            )),
+            Err(_) => {
+                wrkflw_logging::warning(&format!("Timeout removing container: {}", container_id))
             }
-            Err(_) => logging::warning(&format!("Timeout removing container: {}", container_id)),
         }
 
         // Always untrack the container whether or not we succeeded to avoid future cleanup attempts
@@ -462,7 +472,7 @@ impl ContainerRuntime for PodmanRuntime {
         volumes: &[(&Path, &Path)],
     ) -> Result<ContainerOutput, ContainerError> {
         // Print detailed debugging info
-        logging::info(&format!("Podman: Running container with image: {}", image));
+        wrkflw_logging::info(&format!("Podman: Running container with image: {}", image));
 
         let timeout_duration = std::time::Duration::from_secs(360); // 6 minutes timeout
 
@@ -475,7 +485,7 @@ impl ContainerRuntime for PodmanRuntime {
         {
             Ok(result) => result,
             Err(_) => {
-                logging::error("Podman operation timed out after 360 seconds");
+                wrkflw_logging::error("Podman operation timed out after 360 seconds");
                 Err(ContainerError::ContainerExecution(
                     "Operation timed out".to_string(),
                 ))
@@ -490,7 +500,7 @@ impl ContainerRuntime for PodmanRuntime {
         match tokio::time::timeout(timeout_duration, self.pull_image_inner(image)).await {
             Ok(result) => result,
             Err(_) => {
-                logging::warning(&format!(
+                wrkflw_logging::warning(&format!(
                     "Pull of image {} timed out, continuing with existing image",
                     image
                 ));
@@ -508,7 +518,7 @@ impl ContainerRuntime for PodmanRuntime {
         {
             Ok(result) => result,
             Err(_) => {
-                logging::error(&format!(
+                wrkflw_logging::error(&format!(
                     "Building image {} timed out after 120 seconds",
                     tag
                 ));
@@ -664,9 +674,9 @@ impl PodmanRuntime {
         working_dir: &Path,
         volumes: &[(&Path, &Path)],
     ) -> Result<ContainerOutput, ContainerError> {
-        logging::debug(&format!("Running command in Podman: {:?}", cmd));
-        logging::debug(&format!("Environment: {:?}", env_vars));
-        logging::debug(&format!("Working directory: {}", working_dir.display()));
+        wrkflw_logging::debug(&format!("Running command in Podman: {:?}", cmd));
+        wrkflw_logging::debug(&format!("Environment: {:?}", env_vars));
+        wrkflw_logging::debug(&format!("Working directory: {}", working_dir.display()));
 
         // Generate a unique container name
         let container_name = format!("wrkflw-{}", uuid::Uuid::new_v4());
@@ -742,13 +752,13 @@ impl PodmanRuntime {
                         match cleanup_result {
                             Ok(Ok(cleanup_output)) => {
                                 if !cleanup_output.status.success() {
-                                    logging::debug(&format!(
+                                    wrkflw_logging::debug(&format!(
                                         "Failed to remove successful container {}",
                                         container_name
                                     ));
                                 }
                             }
-                            _ => logging::debug(&format!(
+                            _ => wrkflw_logging::debug(&format!(
                                 "Timeout removing successful container {}",
                                 container_name
                             )),
@@ -760,7 +770,7 @@ impl PodmanRuntime {
                     // Failed container
                     if self.preserve_containers_on_failure {
                         // Failed and we want to preserve - don't clean up but untrack from auto-cleanup
-                        logging::info(&format!(
+                        wrkflw_logging::info(&format!(
                             "Preserving failed container {} for debugging (exit code: {}). Use 'podman exec -it {} bash' to inspect.",
                             container_name, output.exit_code, container_name
                         ));
@@ -789,11 +799,11 @@ impl PodmanRuntime {
                     .await;
 
                     match cleanup_result {
-                        Ok(Ok(_)) => logging::debug(&format!(
+                        Ok(Ok(_)) => wrkflw_logging::debug(&format!(
                             "Cleaned up failed execution container {}",
                             container_name
                         )),
-                        _ => logging::debug(&format!(
+                        _ => wrkflw_logging::debug(&format!(
                             "Failed to clean up execution failure container {}",
                             container_name
                         )),
@@ -806,17 +816,17 @@ impl PodmanRuntime {
         match &result {
             Ok(output) => {
                 if output.exit_code != 0 {
-                    logging::info(&format!(
+                    wrkflw_logging::info(&format!(
                         "Podman command failed with exit code: {}",
                         output.exit_code
                     ));
-                    logging::debug(&format!("Failed command: {:?}", cmd));
-                    logging::debug(&format!("Working directory: {}", working_dir.display()));
-                    logging::debug(&format!("STDERR: {}", output.stderr));
+                    wrkflw_logging::debug(&format!("Failed command: {:?}", cmd));
+                    wrkflw_logging::debug(&format!("Working directory: {}", working_dir.display()));
+                    wrkflw_logging::debug(&format!("STDERR: {}", output.stderr));
                 }
             }
             Err(e) => {
-                logging::error(&format!("Podman execution error: {}", e));
+                wrkflw_logging::error(&format!("Podman execution error: {}", e));
             }
         }
 

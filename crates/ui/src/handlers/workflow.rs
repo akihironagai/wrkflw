@@ -2,12 +2,12 @@
 use crate::app::App;
 use crate::models::{ExecutionResultMsg, WorkflowExecution, WorkflowStatus};
 use chrono::Local;
-use evaluator::evaluate_workflow_file;
-use executor::{self, JobStatus, RuntimeType, StepStatus};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
+use wrkflw_evaluator::evaluate_workflow_file;
+use wrkflw_executor::{self, JobStatus, RuntimeType, StepStatus};
 
 // Validate a workflow or directory containing workflows
 pub fn validate_workflow(path: &Path, verbose: bool) -> io::Result<()> {
@@ -20,7 +20,7 @@ pub fn validate_workflow(path: &Path, verbose: bool) -> io::Result<()> {
             let entry = entry?;
             let entry_path = entry.path();
 
-            if entry_path.is_file() && utils::is_workflow_file(&entry_path) {
+            if entry_path.is_file() && wrkflw_utils::is_workflow_file(&entry_path) {
                 workflows.push(entry_path);
             }
         }
@@ -105,18 +105,18 @@ pub async fn execute_workflow_cli(
     // Check container runtime availability if container runtime is selected
     let runtime_type = match runtime_type {
         RuntimeType::Docker => {
-            if !executor::docker::is_available() {
+            if !wrkflw_executor::docker::is_available() {
                 println!("⚠️ Docker is not available. Using emulation mode instead.");
-                logging::warning("Docker is not available. Using emulation mode instead.");
+                wrkflw_logging::warning("Docker is not available. Using emulation mode instead.");
                 RuntimeType::Emulation
             } else {
                 RuntimeType::Docker
             }
         }
         RuntimeType::Podman => {
-            if !executor::podman::is_available() {
+            if !wrkflw_executor::podman::is_available() {
                 println!("⚠️ Podman is not available. Using emulation mode instead.");
-                logging::warning("Podman is not available. Using emulation mode instead.");
+                wrkflw_logging::warning("Podman is not available. Using emulation mode instead.");
                 RuntimeType::Emulation
             } else {
                 RuntimeType::Podman
@@ -129,20 +129,20 @@ pub async fn execute_workflow_cli(
     println!("Runtime mode: {:?}", runtime_type);
 
     // Log the start of the execution in debug mode with more details
-    logging::debug(&format!(
+    wrkflw_logging::debug(&format!(
         "Starting workflow execution: path={}, runtime={:?}, verbose={}",
         path.display(),
         runtime_type,
         verbose
     ));
 
-    let config = executor::ExecutionConfig {
+    let config = wrkflw_executor::ExecutionConfig {
         runtime_type,
         verbose,
         preserve_containers_on_failure: false, // Default for this path
     };
 
-    match executor::execute_workflow(path, config).await {
+    match wrkflw_executor::execute_workflow(path, config).await {
         Ok(result) => {
             println!("\nWorkflow execution results:");
 
@@ -166,7 +166,7 @@ pub async fn execute_workflow_cli(
                 println!("-------------------------");
 
                 // Log the job details for debug purposes
-                logging::debug(&format!("Job: {}, Status: {:?}", job.name, job.status));
+                wrkflw_logging::debug(&format!("Job: {}, Status: {:?}", job.name, job.status));
 
                 for step in job.steps.iter() {
                     match step.status {
@@ -202,7 +202,7 @@ pub async fn execute_workflow_cli(
                             }
 
                             // Show command/run details in debug mode
-                            if logging::get_log_level() <= logging::LogLevel::Debug {
+                            if wrkflw_logging::get_log_level() <= wrkflw_logging::LogLevel::Debug {
                                 if let Some(cmd_output) = step
                                     .output
                                     .lines()
@@ -242,7 +242,7 @@ pub async fn execute_workflow_cli(
                     }
 
                     // Always log the step details for debug purposes
-                    logging::debug(&format!(
+                    wrkflw_logging::debug(&format!(
                         "Step: {}, Status: {:?}, Output length: {} lines",
                         step.name,
                         step.status,
@@ -250,10 +250,10 @@ pub async fn execute_workflow_cli(
                     ));
 
                     // In debug mode, log all step output
-                    if logging::get_log_level() == logging::LogLevel::Debug
+                    if wrkflw_logging::get_log_level() == wrkflw_logging::LogLevel::Debug
                         && !step.output.trim().is_empty()
                     {
-                        logging::debug(&format!(
+                        wrkflw_logging::debug(&format!(
                             "Step output for '{}': \n{}",
                             step.name, step.output
                         ));
@@ -265,7 +265,7 @@ pub async fn execute_workflow_cli(
                 println!("\n❌ Workflow completed with failures");
                 // In the case of failure, we'll also inform the user about the debug option
                 // if they're not already using it
-                if logging::get_log_level() > logging::LogLevel::Debug {
+                if wrkflw_logging::get_log_level() > wrkflw_logging::LogLevel::Debug {
                     println!("    Run with --debug for more detailed output");
                 }
             } else {
@@ -276,7 +276,7 @@ pub async fn execute_workflow_cli(
         }
         Err(e) => {
             println!("❌ Failed to execute workflow: {}", e);
-            logging::error(&format!("Failed to execute workflow: {}", e));
+            wrkflw_logging::error(&format!("Failed to execute workflow: {}", e));
             Err(io::Error::other(e))
         }
     }
@@ -286,7 +286,7 @@ pub async fn execute_workflow_cli(
 pub async fn execute_curl_trigger(
     workflow_name: &str,
     branch: Option<&str>,
-) -> Result<(Vec<executor::JobResult>, ()), String> {
+) -> Result<(Vec<wrkflw_executor::JobResult>, ()), String> {
     // Get GitHub token
     let token = std::env::var("GITHUB_TOKEN").map_err(|_| {
         "GitHub token not found. Please set GITHUB_TOKEN environment variable".to_string()
@@ -294,13 +294,13 @@ pub async fn execute_curl_trigger(
 
     // Debug log to check if GITHUB_TOKEN is set
     match std::env::var("GITHUB_TOKEN") {
-        Ok(token) => logging::info(&format!("GITHUB_TOKEN is set: {}", &token[..5])), // Log first 5 characters for security
-        Err(_) => logging::error("GITHUB_TOKEN is not set"),
+        Ok(token) => wrkflw_logging::info(&format!("GITHUB_TOKEN is set: {}", &token[..5])), // Log first 5 characters for security
+        Err(_) => wrkflw_logging::error("GITHUB_TOKEN is not set"),
     }
 
     // Get repository information
-    let repo_info =
-        github::get_repo_info().map_err(|e| format!("Failed to get repository info: {}", e))?;
+    let repo_info = wrkflw_github::get_repo_info()
+        .map_err(|e| format!("Failed to get repository info: {}", e))?;
 
     // Determine branch to use
     let branch_ref = branch.unwrap_or(&repo_info.default_branch);
@@ -315,7 +315,7 @@ pub async fn execute_curl_trigger(
         workflow_name
     };
 
-    logging::info(&format!("Using workflow name: {}", workflow_name));
+    wrkflw_logging::info(&format!("Using workflow name: {}", workflow_name));
 
     // Construct JSON payload
     let payload = serde_json::json!({
@@ -328,7 +328,7 @@ pub async fn execute_curl_trigger(
         repo_info.owner, repo_info.repo, workflow_name
     );
 
-    logging::info(&format!("Triggering workflow at URL: {}", url));
+    wrkflw_logging::info(&format!("Triggering workflow at URL: {}", url));
 
     // Create a reqwest client
     let client = reqwest::Client::new();
@@ -362,12 +362,12 @@ pub async fn execute_curl_trigger(
     );
 
     // Create a job result structure
-    let job_result = executor::JobResult {
+    let job_result = wrkflw_executor::JobResult {
         name: "GitHub Trigger".to_string(),
-        status: executor::JobStatus::Success,
-        steps: vec![executor::StepResult {
+        status: wrkflw_executor::JobStatus::Success,
+        steps: vec![wrkflw_executor::StepResult {
             name: "Remote Trigger".to_string(),
-            status: executor::StepStatus::Success,
+            status: wrkflw_executor::StepStatus::Success,
             output: success_msg,
         }],
         logs: "Workflow triggered remotely on GitHub".to_string(),
@@ -391,13 +391,13 @@ pub fn start_next_workflow_execution(
         if verbose {
             app.logs
                 .push("Verbose mode: Step outputs will be displayed in full".to_string());
-            logging::info("Verbose mode: Step outputs will be displayed in full");
+            wrkflw_logging::info("Verbose mode: Step outputs will be displayed in full");
         } else {
             app.logs.push(
                 "Standard mode: Only step status will be shown (use --verbose for full output)"
                     .to_string(),
             );
-            logging::info(
+            wrkflw_logging::info(
                 "Standard mode: Only step status will be shown (use --verbose for full output)",
             );
         }
@@ -406,21 +406,24 @@ pub fn start_next_workflow_execution(
         let runtime_type = match app.runtime_type {
             RuntimeType::Docker => {
                 // Use safe FD redirection to check Docker availability
-                let is_docker_available =
-                    match utils::fd::with_stderr_to_null(executor::docker::is_available) {
-                        Ok(result) => result,
-                        Err(_) => {
-                            logging::debug(
-                                "Failed to redirect stderr when checking Docker availability.",
-                            );
-                            false
-                        }
-                    };
+                let is_docker_available = match wrkflw_utils::fd::with_stderr_to_null(
+                    wrkflw_executor::docker::is_available,
+                ) {
+                    Ok(result) => result,
+                    Err(_) => {
+                        wrkflw_logging::debug(
+                            "Failed to redirect stderr when checking Docker availability.",
+                        );
+                        false
+                    }
+                };
 
                 if !is_docker_available {
                     app.logs
                         .push("Docker is not available. Using emulation mode instead.".to_string());
-                    logging::warning("Docker is not available. Using emulation mode instead.");
+                    wrkflw_logging::warning(
+                        "Docker is not available. Using emulation mode instead.",
+                    );
                     RuntimeType::Emulation
                 } else {
                     RuntimeType::Docker
@@ -428,21 +431,24 @@ pub fn start_next_workflow_execution(
             }
             RuntimeType::Podman => {
                 // Use safe FD redirection to check Podman availability
-                let is_podman_available =
-                    match utils::fd::with_stderr_to_null(executor::podman::is_available) {
-                        Ok(result) => result,
-                        Err(_) => {
-                            logging::debug(
-                                "Failed to redirect stderr when checking Podman availability.",
-                            );
-                            false
-                        }
-                    };
+                let is_podman_available = match wrkflw_utils::fd::with_stderr_to_null(
+                    wrkflw_executor::podman::is_available,
+                ) {
+                    Ok(result) => result,
+                    Err(_) => {
+                        wrkflw_logging::debug(
+                            "Failed to redirect stderr when checking Podman availability.",
+                        );
+                        false
+                    }
+                };
 
                 if !is_podman_available {
                     app.logs
                         .push("Podman is not available. Using emulation mode instead.".to_string());
-                    logging::warning("Podman is not available. Using emulation mode instead.");
+                    wrkflw_logging::warning(
+                        "Podman is not available. Using emulation mode instead.",
+                    );
                     RuntimeType::Emulation
                 } else {
                     RuntimeType::Podman
@@ -487,21 +493,21 @@ pub fn start_next_workflow_execution(
                         Ok(validation_result) => {
                             // Create execution result based on validation
                             let status = if validation_result.is_valid {
-                                executor::JobStatus::Success
+                                wrkflw_executor::JobStatus::Success
                             } else {
-                                executor::JobStatus::Failure
+                                wrkflw_executor::JobStatus::Failure
                             };
 
                             // Create a synthetic job result for validation
-                            let jobs = vec![executor::JobResult {
+                            let jobs = vec![wrkflw_executor::JobResult {
                                 name: "Validation".to_string(),
                                 status,
-                                steps: vec![executor::StepResult {
+                                steps: vec![wrkflw_executor::StepResult {
                                     name: "Validator".to_string(),
                                     status: if validation_result.is_valid {
-                                        executor::StepStatus::Success
+                                        wrkflw_executor::StepStatus::Success
                                     } else {
-                                        executor::StepStatus::Failure
+                                        wrkflw_executor::StepStatus::Failure
                                     },
                                     output: validation_result.issues.join("\n"),
                                 }],
@@ -521,15 +527,15 @@ pub fn start_next_workflow_execution(
                     }
                 } else {
                     // Use safe FD redirection for execution
-                    let config = executor::ExecutionConfig {
+                    let config = wrkflw_executor::ExecutionConfig {
                         runtime_type,
                         verbose,
                         preserve_containers_on_failure,
                     };
 
-                    let execution_result = utils::fd::with_stderr_to_null(|| {
+                    let execution_result = wrkflw_utils::fd::with_stderr_to_null(|| {
                         futures::executor::block_on(async {
-                            executor::execute_workflow(&workflow_path, config).await
+                            wrkflw_executor::execute_workflow(&workflow_path, config).await
                         })
                     })
                     .map_err(|e| format!("Failed to redirect stderr during execution: {}", e))?;
@@ -546,7 +552,7 @@ pub fn start_next_workflow_execution(
 
             // Only send if we get a valid result
             if let Err(e) = tx_clone_inner.send((next_idx, result)) {
-                logging::error(&format!("Error sending execution result: {}", e));
+                wrkflw_logging::error(&format!("Error sending execution result: {}", e));
             }
         });
     } else {
@@ -554,6 +560,6 @@ pub fn start_next_workflow_execution(
         let timestamp = Local::now().format("%H:%M:%S").to_string();
         app.logs
             .push(format!("[{}] All workflows completed execution", timestamp));
-        logging::info("All workflows completed execution");
+        wrkflw_logging::info("All workflows completed execution");
     }
 }

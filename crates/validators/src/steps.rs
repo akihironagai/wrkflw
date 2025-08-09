@@ -1,7 +1,7 @@
 use crate::validate_action_reference;
-use models::ValidationResult;
 use serde_yaml::Value;
 use std::collections::HashSet;
+use wrkflw_models::ValidationResult;
 
 pub fn validate_steps(steps: &[Value], job_name: &str, result: &mut ValidationResult) {
     let mut step_ids: HashSet<String> = HashSet::new();

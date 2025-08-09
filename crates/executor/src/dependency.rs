@@ -1,5 +1,5 @@
-use parser::workflow::WorkflowDefinition;
 use std::collections::{HashMap, HashSet};
+use wrkflw_parser::workflow::WorkflowDefinition;
 
 pub fn resolve_dependencies(workflow: &WorkflowDefinition) -> Result<Vec<Vec<String>>, String> {
     let jobs = &workflow.jobs;

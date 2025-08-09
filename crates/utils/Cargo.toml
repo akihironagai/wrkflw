@@ -1,13 +1,18 @@
 [package]
-name = "utils"
+name = "wrkflw-utils"
 version.workspace = true
 edition.workspace = true
-description = "utility functions for wrkflw"
+description = "Utility functions for wrkflw workflow execution engine"
 license.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 # Internal crates
-models = { path = "../models" }
+wrkflw-models = { path = "../models", version = "0.5.0" }
 
 # External dependencies
 serde.workspace = true

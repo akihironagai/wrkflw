@@ -1,5 +1,5 @@
-use models::ValidationResult;
 use serde_yaml::Value;
+use wrkflw_models::ValidationResult;
 
 pub fn validate_matrix(matrix: &Value, result: &mut ValidationResult) {
     // Check if matrix is a mapping

@@ -5,10 +5,10 @@ use crate::models::{
 };
 use chrono::Local;
 use crossterm::event::KeyCode;
-use executor::{JobStatus, RuntimeType, StepStatus};
 use ratatui::widgets::{ListState, TableState};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use wrkflw_executor::{JobStatus, RuntimeType, StepStatus};
 
 /// Application state
 pub struct App {
@@ -69,8 +69,10 @@ impl App {
                     // Use a very short timeout to prevent blocking the UI
                     let result = std::thread::scope(|s| {
                         let handle = s.spawn(|| {
-                            utils::fd::with_stderr_to_null(executor::docker::is_available)
-                                .unwrap_or(false)
+                            wrkflw_utils::fd::with_stderr_to_null(
+                                wrkflw_executor::docker::is_available,
+                            )
+                            .unwrap_or(false)
                         });
 
                         // Set a short timeout for the thread
@@ -85,7 +87,7 @@ impl App {
                         }
 
                         // If we reach here, the check took too long
-                        logging::warning(
+                        wrkflw_logging::warning(
                             "Docker availability check timed out, falling back to emulation mode",
                         );
                         false
@@ -94,7 +96,7 @@ impl App {
                 }) {
                     Ok(result) => result,
                     Err(_) => {
-                        logging::warning("Docker availability check failed with panic, falling back to emulation mode");
+                        wrkflw_logging::warning("Docker availability check failed with panic, falling back to emulation mode");
                         false
                     }
                 };
@@ -104,12 +106,12 @@ impl App {
                         "Docker is not available or unresponsive. Using emulation mode instead."
                             .to_string(),
                     );
-                    logging::warning(
+                    wrkflw_logging::warning(
                         "Docker is not available or unresponsive. Using emulation mode instead.",
                     );
                     RuntimeType::Emulation
                 } else {
-                    logging::info("Docker is available, using Docker runtime");
+                    wrkflw_logging::info("Docker is available, using Docker runtime");
                     RuntimeType::Docker
                 }
             }
@@ -119,8 +121,10 @@ impl App {
                     // Use a very short timeout to prevent blocking the UI
                     let result = std::thread::scope(|s| {
                         let handle = s.spawn(|| {
-                            utils::fd::with_stderr_to_null(executor::podman::is_available)
-                                .unwrap_or(false)
+                            wrkflw_utils::fd::with_stderr_to_null(
+                                wrkflw_executor::podman::is_available,
+                            )
+                            .unwrap_or(false)
                         });
 
                         // Set a short timeout for the thread
@@ -135,7 +139,7 @@ impl App {
                         }
 
                         // If we reach here, the check took too long
-                        logging::warning(
+                        wrkflw_logging::warning(
                             "Podman availability check timed out, falling back to emulation mode",
                         );
                         false
@@ -144,7 +148,7 @@ impl App {
                 }) {
                     Ok(result) => result,
                     Err(_) => {
-                        logging::warning("Podman availability check failed with panic, falling back to emulation mode");
+                        wrkflw_logging::warning("Podman availability check failed with panic, falling back to emulation mode");
                         false
                     }
                 };
@@ -154,12 +158,12 @@ impl App {
                         "Podman is not available or unresponsive. Using emulation mode instead."
                             .to_string(),
                     );
-                    logging::warning(
+                    wrkflw_logging::warning(
                         "Podman is not available or unresponsive. Using emulation mode instead.",
                     );
                     RuntimeType::Emulation
                 } else {
-                    logging::info("Podman is available, using Podman runtime");
+                    wrkflw_logging::info("Podman is available, using Podman runtime");
                     RuntimeType::Podman
                 }
             }
@@ -227,7 +231,7 @@ impl App {
         let timestamp = Local::now().format("%H:%M:%S").to_string();
         self.logs
             .push(format!("[{}] Switched to {} mode", timestamp, mode));
-        logging::info(&format!("Switched to {} mode", mode));
+        wrkflw_logging::info(&format!("Switched to {} mode", mode));
     }
 
     pub fn runtime_type_name(&self) -> &str {
@@ -445,7 +449,7 @@ impl App {
             let timestamp = Local::now().format("%H:%M:%S").to_string();
             self.logs
                 .push(format!("[{}] Starting workflow execution...", timestamp));
-            logging::info("Starting workflow execution...");
+            wrkflw_logging::info("Starting workflow execution...");
         }
     }
 
@@ -453,7 +457,7 @@ impl App {
     pub fn process_execution_result(
         &mut self,
         workflow_idx: usize,
-        result: Result<(Vec<executor::JobResult>, ()), String>,
+        result: Result<(Vec<wrkflw_executor::JobResult>, ()), String>,
     ) {
         if workflow_idx >= self.workflows.len() {
             let timestamp = Local::now().format("%H:%M:%S").to_string();
@@ -461,7 +465,7 @@ impl App {
                 "[{}] Error: Invalid workflow index received",
                 timestamp
             ));
-            logging::error("Invalid workflow index received in process_execution_result");
+            wrkflw_logging::error("Invalid workflow index received in process_execution_result");
             return;
         }
 
@@ -490,15 +494,15 @@ impl App {
                         .push(format!("[{}] Operation completed successfully.", timestamp));
                     execution_details.progress = 1.0;
 
-                    // Convert executor::JobResult to our JobExecution struct
+                    // Convert wrkflw_executor::JobResult to our JobExecution struct
                     execution_details.jobs = jobs
                         .iter()
                         .map(|job_result| JobExecution {
                             name: job_result.name.clone(),
                             status: match job_result.status {
-                                executor::JobStatus::Success => JobStatus::Success,
-                                executor::JobStatus::Failure => JobStatus::Failure,
-                                executor::JobStatus::Skipped => JobStatus::Skipped,
+                                wrkflw_executor::JobStatus::Success => JobStatus::Success,
+                                wrkflw_executor::JobStatus::Failure => JobStatus::Failure,
+                                wrkflw_executor::JobStatus::Skipped => JobStatus::Skipped,
                             },
                             steps: job_result
                                 .steps
@@ -506,9 +510,9 @@ impl App {
                                 .map(|step_result| StepExecution {
                                     name: step_result.name.clone(),
                                     status: match step_result.status {
-                                        executor::StepStatus::Success => StepStatus::Success,
-                                        executor::StepStatus::Failure => StepStatus::Failure,
-                                        executor::StepStatus::Skipped => StepStatus::Skipped,
+                                        wrkflw_executor::StepStatus::Success => StepStatus::Success,
+                                        wrkflw_executor::StepStatus::Failure => StepStatus::Failure,
+                                        wrkflw_executor::StepStatus::Skipped => StepStatus::Skipped,
                                     },
                                     output: step_result.output.clone(),
                                 })
@@ -547,7 +551,7 @@ impl App {
                     "[{}] Workflow '{}' completed successfully!",
                     timestamp, workflow.name
                 ));
-                logging::info(&format!(
+                wrkflw_logging::info(&format!(
                     "[{}] Workflow '{}' completed successfully!",
                     timestamp, workflow.name
                 ));
@@ -559,7 +563,7 @@ impl App {
                     "[{}] Workflow '{}' failed: {}",
                     timestamp, workflow.name, e
                 ));
-                logging::error(&format!(
+                wrkflw_logging::error(&format!(
                     "[{}] Workflow '{}' failed: {}",
                     timestamp, workflow.name, e
                 ));
@@ -585,7 +589,7 @@ impl App {
         self.current_execution = Some(next);
         self.logs
             .push(format!("Executing workflow: {}", self.workflows[next].name));
-        logging::info(&format!(
+        wrkflw_logging::info(&format!(
             "Executing workflow: {}",
             self.workflows[next].name
         ));
@@ -688,7 +692,7 @@ impl App {
         for log in &self.logs {
             all_logs.push(log.clone());
         }
-        for log in logging::get_logs() {
+        for log in wrkflw_logging::get_logs() {
             all_logs.push(log.clone());
         }
 
@@ -780,7 +784,7 @@ impl App {
     // Scroll logs down
     pub fn scroll_logs_down(&mut self) {
         // Get total log count including system logs
-        let total_logs = self.logs.len() + logging::get_logs().len();
+        let total_logs = self.logs.len() + wrkflw_logging::get_logs().len();
         if total_logs > 0 {
             self.log_scroll = (self.log_scroll + 1).min(total_logs - 1);
         }
@@ -834,7 +838,9 @@ impl App {
                     let timestamp = Local::now().format("%H:%M:%S").to_string();
                     self.logs
                         .push(format!("[{}] Error: Invalid workflow selection", timestamp));
-                    logging::error("Invalid workflow selection in trigger_selected_workflow");
+                    wrkflw_logging::error(
+                        "Invalid workflow selection in trigger_selected_workflow",
+                    );
                     return;
                 }
 
@@ -844,7 +850,7 @@ impl App {
                     "[{}] Triggering workflow: {}",
                     timestamp, workflow.name
                 ));
-                logging::info(&format!("Triggering workflow: {}", workflow.name));
+                wrkflw_logging::info(&format!("Triggering workflow: {}", workflow.name));
 
                 // Clone necessary values for the async task
                 let workflow_name = workflow.name.clone();
@@ -877,19 +883,19 @@ impl App {
 
                     // Send the result back to the main thread
                     if let Err(e) = tx_clone.send((selected_idx, result)) {
-                        logging::error(&format!("Error sending trigger result: {}", e));
+                        wrkflw_logging::error(&format!("Error sending trigger result: {}", e));
                     }
                 });
             } else {
                 let timestamp = Local::now().format("%H:%M:%S").to_string();
                 self.logs
                     .push(format!("[{}] No workflow selected to trigger", timestamp));
-                logging::warning("No workflow selected to trigger");
+                wrkflw_logging::warning("No workflow selected to trigger");
             }
         } else {
             self.logs
                 .push("No workflow selected to trigger".to_string());
-            logging::warning("No workflow selected to trigger");
+            wrkflw_logging::warning("No workflow selected to trigger");
         }
     }
 
@@ -902,7 +908,7 @@ impl App {
                 "[{}] Debug: No workflow selected for reset",
                 timestamp
             ));
-            logging::warning("No workflow selected for reset");
+            wrkflw_logging::warning("No workflow selected for reset");
             return;
         }
 
@@ -939,7 +945,7 @@ impl App {
                     "[{}] Reset workflow '{}' from {} state to NotStarted - status is now {:?}",
                     timestamp, workflow.name, old_status, workflow.status
                 ));
-                logging::info(&format!(
+                wrkflw_logging::info(&format!(
                     "Reset workflow '{}' from {} state to NotStarted - status is now {:?}",
                     workflow.name, old_status, workflow.status
                 ));

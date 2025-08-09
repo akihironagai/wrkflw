@@ -3,8 +3,8 @@ use serde_yaml::{self, Value};
 use std::fs;
 use std::path::Path;
 
-use models::ValidationResult;
-use validators::{validate_jobs, validate_triggers};
+use wrkflw_models::ValidationResult;
+use wrkflw_validators::{validate_jobs, validate_triggers};
 
 pub fn evaluate_workflow_file(path: &Path, verbose: bool) -> Result<ValidationResult, String> {
     let content = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;

@@ -1,14 +1,19 @@
 [package]
-name = "parser"
+name = "wrkflw-parser"
 version.workspace = true
 edition.workspace = true
-description = "Parser functionality for wrkflw"
+description = "Workflow parsing functionality for wrkflw execution engine"
 license.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
 # Internal crates
-models = { path = "../models" }
-matrix = { path = "../matrix" }
+wrkflw-models = { path = "../models", version = "0.5.0" }
+wrkflw-matrix = { path = "../matrix", version = "0.5.0" }
 
 # External dependencies
 jsonschema.workspace = true

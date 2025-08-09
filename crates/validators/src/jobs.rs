@@ -1,6 +1,6 @@
 use crate::{validate_matrix, validate_steps};
-use models::ValidationResult;
 use serde_yaml::Value;
+use wrkflw_models::ValidationResult;
 
 pub fn validate_jobs(jobs: &Value, result: &mut ValidationResult) {
     if let Value::Mapping(jobs_map) = jobs {

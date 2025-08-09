@@ -11,12 +11,12 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use executor::RuntimeType;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io::{self, stdout};
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use wrkflw_executor::RuntimeType;
 
 pub use state::App;
 
@@ -50,7 +50,7 @@ pub async fn run_wrkflw_tui(
 
     if app.validation_mode {
         app.logs.push("Starting in validation mode".to_string());
-        logging::info("Starting in validation mode");
+        wrkflw_logging::info("Starting in validation mode");
     }
 
     // Load workflows
@@ -108,13 +108,13 @@ pub async fn run_wrkflw_tui(
         Ok(_) => Ok(()),
         Err(e) => {
             // If the TUI fails to initialize or crashes, fall back to CLI mode
-            logging::error(&format!("Failed to start UI: {}", e));
+            wrkflw_logging::error(&format!("Failed to start UI: {}", e));
 
             // Only for 'tui' command should we fall back to CLI mode for files
             // For other commands, return the error
             if let Some(path) = path {
                 if path.is_file() {
-                    logging::error("Falling back to CLI mode...");
+                    wrkflw_logging::error("Falling back to CLI mode...");
                     crate::handlers::workflow::execute_workflow_cli(path, runtime_type, verbose)
                         .await
                 } else if path.is_dir() {
@@ -273,7 +273,7 @@ fn run_tui_event_loop(
                                 "[{}] DEBUG: Shift+r detected - this should be uppercase R",
                                 timestamp
                             ));
-                            logging::info(
+                            wrkflw_logging::info(
                                 "Shift+r detected as lowercase - this should be uppercase R",
                             );
 
@@ -329,7 +329,7 @@ fn run_tui_event_loop(
                             "[{}] DEBUG: Reset key 'Shift+R' pressed",
                             timestamp
                         ));
-                        logging::info("Reset key 'Shift+R' pressed");
+                        wrkflw_logging::info("Reset key 'Shift+R' pressed");
 
                         if !app.running {
                             // Reset workflow status
@@ -367,7 +367,7 @@ fn run_tui_event_loop(
                                             "Workflow '{}' is already running",
                                             workflow.name
                                         ));
-                                        logging::warning(&format!(
+                                        wrkflw_logging::warning(&format!(
                                             "Workflow '{}' is already running",
                                             workflow.name
                                         ));
@@ -408,7 +408,7 @@ fn run_tui_event_loop(
                                             ));
                                         }
 
-                                        logging::warning(&format!(
+                                        wrkflw_logging::warning(&format!(
                                             "Cannot trigger workflow in {} state",
                                             status_text
                                         ));
@@ -416,20 +416,22 @@ fn run_tui_event_loop(
                                 }
                             } else {
                                 app.logs.push("No workflow selected to trigger".to_string());
-                                logging::warning("No workflow selected to trigger");
+                                wrkflw_logging::warning("No workflow selected to trigger");
                             }
                         } else if app.running {
                             app.logs.push(
                                 "Cannot trigger workflow while another operation is in progress"
                                     .to_string(),
                             );
-                            logging::warning(
+                            wrkflw_logging::warning(
                                 "Cannot trigger workflow while another operation is in progress",
                             );
                         } else if app.selected_tab != 0 {
                             app.logs
                                 .push("Switch to Workflows tab to trigger a workflow".to_string());
-                            logging::warning("Switch to Workflows tab to trigger a workflow");
+                            wrkflw_logging::warning(
+                                "Switch to Workflows tab to trigger a workflow",
+                            );
                             // For better UX, we could also automatically switch to the Workflows tab here
                             app.switch_tab(0);
                         }

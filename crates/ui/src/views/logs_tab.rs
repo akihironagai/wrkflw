@@ -151,7 +151,7 @@ pub fn render_logs_tab(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App, a
     }
 
     // Process system logs
-    for log in logging::get_logs() {
+    for log in wrkflw_logging::get_logs() {
         all_logs.push(log.clone());
     }
 
