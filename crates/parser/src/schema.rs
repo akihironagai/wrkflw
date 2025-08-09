@@ -3,8 +3,8 @@ use serde_json::Value;
 use std::fs;
 use std::path::Path;
 
-const GITHUB_WORKFLOW_SCHEMA: &str = include_str!("../../../../schemas/github-workflow.json");
-const GITLAB_CI_SCHEMA: &str = include_str!("../../../../schemas/gitlab-ci.json");
+const GITHUB_WORKFLOW_SCHEMA: &str = include_str!("github-workflow.json");
+const GITLAB_CI_SCHEMA: &str = include_str!("gitlab-ci.json");
 
 #[derive(Debug, Clone, Copy)]
 pub enum SchemaType {
