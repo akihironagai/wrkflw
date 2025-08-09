@@ -12,12 +12,12 @@ categories.workspace = true
 
 [dependencies]
 # Internal crates
-wrkflw-models = { path = "../models", version = "0.5.0" }
-wrkflw-parser = { path = "../parser", version = "0.5.0" }
-wrkflw-runtime = { path = "../runtime", version = "0.5.0" }
-wrkflw-logging = { path = "../logging", version = "0.5.0" }
-wrkflw-matrix = { path = "../matrix", version = "0.5.0" }
-wrkflw-utils = { path = "../utils", version = "0.5.0" }
+wrkflw-models = { path = "../models", version = "0.6.0" }
+wrkflw-parser = { path = "../parser", version = "0.6.0" }
+wrkflw-runtime = { path = "../runtime", version = "0.6.0" }
+wrkflw-logging = { path = "../logging", version = "0.6.0" }
+wrkflw-matrix = { path = "../matrix", version = "0.6.0" }
+wrkflw-utils = { path = "../utils", version = "0.6.0" }
 
 # External dependencies
 async-trait.workspace = true
