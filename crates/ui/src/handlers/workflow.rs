@@ -95,10 +95,10 @@ pub async fn execute_workflow_cli(
             }
         }
         Err(e) => {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("Error validating workflow: {}", e),
-            ));
+            return Err(io::Error::other(format!(
+                "Error validating workflow: {}",
+                e
+            )));
         }
     }
 
@@ -262,7 +262,7 @@ pub async fn execute_workflow_cli(
         Err(e) => {
             println!("❌ Failed to execute workflow: {}", e);
             logging::error(&format!("Failed to execute workflow: {}", e));
-            Err(io::Error::new(io::ErrorKind::Other, e))
+            Err(io::Error::other(e))
         }
     }
 }

@@ -35,7 +35,7 @@ impl Button {
     }
 
     /// Render the button
-    pub fn render(&self) -> Paragraph {
+    pub fn render(&self) -> Paragraph<'_> {
         let (fg, bg) = match (self.is_selected, self.is_active) {
             (true, true) => (Color::Black, Color::Yellow),
             (true, false) => (Color::Black, Color::DarkGray),

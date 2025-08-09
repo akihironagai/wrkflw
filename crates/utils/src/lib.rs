@@ -58,7 +58,7 @@ pub mod fd {
             // Duplicate the current stderr fd
             let stderr_backup = match dup(STDERR_FILENO) {
                 Ok(fd) => fd,
-                Err(e) => return Err(io::Error::new(io::ErrorKind::Other, e)),
+                Err(e) => return Err(io::Error::other(e)),
             };
 
             // Open /dev/null
@@ -66,7 +66,7 @@ pub mod fd {
                 Ok(fd) => fd,
                 Err(e) => {
                     let _ = close(stderr_backup); // Clean up on error
-                    return Err(io::Error::new(io::ErrorKind::Other, e));
+                    return Err(io::Error::other(e));
                 }
             };
 
@@ -74,7 +74,7 @@ pub mod fd {
             if let Err(e) = dup2(null_fd, STDERR_FILENO) {
                 let _ = close(stderr_backup); // Clean up on error
                 let _ = close(null_fd);
-                return Err(io::Error::new(io::ErrorKind::Other, e));
+                return Err(io::Error::other(e));
             }
 
             Ok(RedirectedStderr {
