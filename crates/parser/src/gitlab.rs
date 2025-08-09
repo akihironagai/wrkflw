@@ -136,6 +136,9 @@ pub fn convert_to_workflow_format(pipeline: &Pipeline) -> workflow::WorkflowDefi
             env: HashMap::new(),
             matrix: None,
             services: HashMap::new(),
+            if_condition: None,
+            outputs: None,
+            permissions: None,
         };
 
         // Add job-specific environment variables
