@@ -26,6 +26,7 @@ WRKFLW is a powerful command-line tool for validating and executing GitHub Actio
   - Composite actions
   - Local actions
 - **Special Action Handling**: Native handling for commonly used actions like `actions/checkout`
+- **Reusable Workflows (Caller Jobs)**: Execute jobs that call reusable workflows via `jobs.<id>.uses` (local path or `owner/repo/path@ref`)
 - **Output Capturing**: View logs, step outputs, and execution details
 - **Parallel Job Execution**: Runs independent jobs in parallel for faster workflow execution
 - **Trigger Workflows Remotely**: Manually trigger workflow runs on GitHub or GitLab
@@ -372,6 +373,7 @@ podman ps -a --filter "name=wrkflw-" --format "{{.Names}}" | xargs podman rm -f
 - ✅ Composite actions (all composite actions, including nested and local composite actions, are supported)
 - ✅ Local actions (actions referenced with local paths are supported)
 - ✅ Special handling for common actions (e.g., `actions/checkout` is natively supported)
+- ✅ Reusable workflows (caller): Jobs that use `jobs.<id>.uses` to call local or remote workflows are executed; inputs and secrets are propagated to the called workflow
 - ✅ Workflow triggering via `workflow_dispatch` (manual triggering of workflows is supported)
 - ✅ GitLab pipeline triggering (manual triggering of GitLab pipelines is supported)
 - ✅ Environment files (`GITHUB_OUTPUT`, `GITHUB_ENV`, `GITHUB_PATH`, `GITHUB_STEP_SUMMARY` are fully supported)
@@ -395,6 +397,42 @@ podman ps -a --filter "name=wrkflw-" --format "{{.Names}}" | xargs podman rm -f
 - ❌ Job/step timeouts: Custom timeouts for jobs and steps are NOT enforced.
 - ❌ Job/step concurrency and cancellation: Features like `concurrency` and job cancellation are NOT supported.
 - ❌ Expressions and advanced YAML features: Most common expressions are supported, but some advanced or edge-case expressions may not be fully implemented.
+- ⚠️ Reusable workflows (limits):
+  - Outputs from called workflows are not propagated back to the caller (`needs.<id>.outputs.*` not supported)
+  - `secrets: inherit` is not special-cased; provide a mapping to pass secrets
+  - Remote calls clone public repos via HTTPS; private repos require preconfigured access (not yet implemented)
+  - Deeply nested reusable calls work but lack cycle detection beyond regular job dependency checks
+
+## Reusable Workflows
+
+WRKFLW supports executing reusable workflow caller jobs.
+
+### Syntax
+
+```yaml
+jobs:
+  call-local:
+    uses: ./.github/workflows/shared.yml
+
+  call-remote:
+    uses: my-org/my-repo/.github/workflows/shared.yml@v1
+    with:
+      foo: bar
+    secrets:
+      token: ${{ secrets.MY_TOKEN }}
+```
+
+### Behavior
+- Local references are resolved relative to the current working directory.
+- Remote references are shallow-cloned at the specified `@ref` into a temporary directory.
+- `with:` entries are exposed to the called workflow as environment variables `INPUT_<KEY>`.
+- `secrets:` mapping entries are exposed as environment variables `SECRET_<KEY>`.
+- The called workflow executes according to its own `jobs`/`needs`; a summary of its job results is reported as a single result for the caller job.
+
+### Current limitations
+- Outputs from called workflows are not surfaced back to the caller.
+- `secrets: inherit` is not supported; specify an explicit mapping.
+- Private repositories for remote `uses:` are not yet supported.
 
 ### Runtime Mode Differences
 - **Docker Mode**: Provides the closest match to GitHub's environment, including support for Docker container actions, service containers, and Linux-based jobs. Some advanced container configurations may still require manual setup.

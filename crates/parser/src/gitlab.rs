@@ -130,7 +130,7 @@ pub fn convert_to_workflow_format(pipeline: &Pipeline) -> workflow::WorkflowDefi
 
         // Create a new job
         let mut job = workflow::Job {
-            runs_on: "ubuntu-latest".to_string(), // Default runner
+            runs_on: Some("ubuntu-latest".to_string()), // Default runner
             needs: None,
             steps: Vec::new(),
             env: HashMap::new(),
@@ -139,6 +139,9 @@ pub fn convert_to_workflow_format(pipeline: &Pipeline) -> workflow::WorkflowDefi
             if_condition: None,
             outputs: None,
             permissions: None,
+            uses: None,
+            with: None,
+            secrets: None,
         };
 
         // Add job-specific environment variables
@@ -230,13 +233,13 @@ pub fn convert_to_workflow_format(pipeline: &Pipeline) -> workflow::WorkflowDefi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    // use std::path::PathBuf; // unused
     use tempfile::NamedTempFile;
 
     #[test]
     fn test_parse_simple_pipeline() {
         // Create a temporary file with a simple GitLab CI/CD pipeline
-        let mut file = NamedTempFile::new().unwrap();
+        let file = NamedTempFile::new().unwrap();
         let content = r#"
 stages:
   - build
