@@ -39,9 +39,10 @@ pub struct WorkflowDefinition {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Job {
     #[serde(rename = "runs-on")]
-    pub runs_on: String,
+    pub runs_on: Option<String>,
     #[serde(default, deserialize_with = "deserialize_needs")]
     pub needs: Option<Vec<String>>,
+    #[serde(default)]
     pub steps: Vec<Step>,
     #[serde(default)]
     pub env: HashMap<String, String>,
@@ -55,6 +56,13 @@ pub struct Job {
     pub outputs: Option<HashMap<String, String>>,
     #[serde(default)]
     pub permissions: Option<HashMap<String, String>>,
+    // Reusable workflow (job-level 'uses') support
+    #[serde(default)]
+    pub uses: Option<String>,
+    #[serde(default)]
+    pub with: Option<HashMap<String, String>>,
+    #[serde(default)]
+    pub secrets: Option<serde_yaml::Value>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

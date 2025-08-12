@@ -652,6 +652,12 @@ async fn execute_job(ctx: JobExecutionContext<'_>) -> Result<JobResult, Executio
         ExecutionError::Execution(format!("Job '{}' not found in workflow", ctx.job_name))
     })?;
 
+    // Handle reusable workflow jobs (job-level 'uses')
+    if let Some(uses) = &job.uses {
+        return execute_reusable_workflow_job(&ctx, uses, job.with.as_ref(), job.secrets.as_ref())
+            .await;
+    }
+
     // Clone context and add job-specific variables
     let mut job_env = ctx.env_context.clone();
 
@@ -685,6 +691,9 @@ async fn execute_job(ctx: JobExecutionContext<'_>) -> Result<JobResult, Executio
     let mut job_success = true;
 
     // Execute job steps
+    // Determine runner image (default if not provided)
+    let runner_image_value = get_runner_image_from_opt(&job.runs_on);
+
     for (idx, step) in job.steps.iter().enumerate() {
         let step_result = execute_step(StepExecutionContext {
             step,
@@ -693,7 +702,7 @@ async fn execute_job(ctx: JobExecutionContext<'_>) -> Result<JobResult, Executio
             working_dir: job_dir.path(),
             runtime: ctx.runtime,
             workflow: ctx.workflow,
-            runner_image: &get_runner_image(&job.runs_on),
+            runner_image: &runner_image_value,
             verbose: ctx.verbose,
             matrix_combination: &None,
         })
@@ -882,6 +891,9 @@ async fn execute_matrix_job(
         true
     } else {
         // Execute each step
+        // Determine runner image (default if not provided)
+        let runner_image_value = get_runner_image_from_opt(&job_template.runs_on);
+
         for (idx, step) in job_template.steps.iter().enumerate() {
             match execute_step(StepExecutionContext {
                 step,
@@ -890,7 +902,7 @@ async fn execute_matrix_job(
                 working_dir: job_dir.path(),
                 runtime,
                 workflow,
-                runner_image: &get_runner_image(&job_template.runs_on),
+                runner_image: &runner_image_value,
                 verbose,
                 matrix_combination: &Some(combination.values.clone()),
             })
@@ -1748,6 +1760,185 @@ fn get_runner_image(runs_on: &str) -> String {
         }
     }
     .to_string()
+}
+
+fn get_runner_image_from_opt(runs_on: &Option<String>) -> String {
+    let default = "ubuntu-latest";
+    let ro = runs_on.as_deref().unwrap_or(default);
+    get_runner_image(ro)
+}
+
+async fn execute_reusable_workflow_job(
+    ctx: &JobExecutionContext<'_>,
+    uses: &str,
+    with: Option<&HashMap<String, String>>,
+    secrets: Option<&serde_yaml::Value>,
+) -> Result<JobResult, ExecutionError> {
+    wrkflw_logging::info(&format!(
+        "Executing reusable workflow job '{}' -> {}",
+        ctx.job_name, uses
+    ));
+
+    // Resolve the called workflow file path
+    enum UsesRef<'a> {
+        LocalPath(&'a str),
+        Remote {
+            owner: String,
+            repo: String,
+            path: String,
+            r#ref: String,
+        },
+    }
+
+    let uses_ref = if uses.starts_with("./") || uses.starts_with('/') {
+        UsesRef::LocalPath(uses)
+    } else {
+        // Expect format owner/repo/path/to/workflow.yml@ref
+        let parts: Vec<&str> = uses.split('@').collect();
+        if parts.len() != 2 {
+            return Err(ExecutionError::Execution(format!(
+                "Invalid reusable workflow reference: {}",
+                uses
+            )));
+        }
+        let left = parts[0];
+        let r#ref = parts[1].to_string();
+        let mut segs = left.splitn(3, '/');
+        let owner = segs.next().unwrap_or("").to_string();
+        let repo = segs.next().unwrap_or("").to_string();
+        let path = segs.next().unwrap_or("").to_string();
+        if owner.is_empty() || repo.is_empty() || path.is_empty() {
+            return Err(ExecutionError::Execution(format!(
+                "Invalid reusable workflow reference: {}",
+                uses
+            )));
+        }
+        UsesRef::Remote {
+            owner,
+            repo,
+            path,
+            r#ref,
+        }
+    };
+
+    // Load workflow file
+    let workflow_path = match uses_ref {
+        UsesRef::LocalPath(p) => {
+            // Resolve relative to current directory
+            let current_dir = std::env::current_dir().map_err(|e| {
+                ExecutionError::Execution(format!("Failed to get current dir: {}", e))
+            })?;
+            let path = current_dir.join(p);
+            if !path.exists() {
+                return Err(ExecutionError::Execution(format!(
+                    "Reusable workflow not found at path: {}",
+                    path.display()
+                )));
+            }
+            path
+        }
+        UsesRef::Remote {
+            owner,
+            repo,
+            path,
+            r#ref,
+        } => {
+            // Clone minimal repository and checkout ref
+            let tempdir = tempfile::tempdir().map_err(|e| {
+                ExecutionError::Execution(format!("Failed to create temp dir: {}", e))
+            })?;
+            let repo_url = format!("https://github.com/{}/{}.git", owner, repo);
+            // git clone
+            let status = Command::new("git")
+                .arg("clone")
+                .arg("--depth")
+                .arg("1")
+                .arg("--branch")
+                .arg(&r#ref)
+                .arg(&repo_url)
+                .arg(tempdir.path())
+                .status()
+                .map_err(|e| ExecutionError::Execution(format!("Failed to execute git: {}", e)))?;
+            if !status.success() {
+                return Err(ExecutionError::Execution(format!(
+                    "Failed to clone {}@{}",
+                    repo_url, r#ref
+                )));
+            }
+            let joined = tempdir.path().join(path);
+            if !joined.exists() {
+                return Err(ExecutionError::Execution(format!(
+                    "Reusable workflow file not found in repo: {}",
+                    joined.display()
+                )));
+            }
+            joined
+        }
+    };
+
+    // Parse called workflow
+    let called = parse_workflow(&workflow_path)?;
+
+    // Create child env context
+    let mut child_env = ctx.env_context.clone();
+    if let Some(with_map) = with {
+        for (k, v) in with_map {
+            child_env.insert(format!("INPUT_{}", k.to_uppercase()), v.clone());
+        }
+    }
+    if let Some(secrets_val) = secrets {
+        if let Some(map) = secrets_val.as_mapping() {
+            for (k, v) in map {
+                if let (Some(key), Some(value)) = (k.as_str(), v.as_str()) {
+                    child_env.insert(format!("SECRET_{}", key.to_uppercase()), value.to_string());
+                }
+            }
+        }
+    }
+
+    // Execute called workflow
+    let plan = dependency::resolve_dependencies(&called)?;
+    let mut all_results = Vec::new();
+    let mut any_failed = false;
+    for batch in plan {
+        let results =
+            execute_job_batch(&batch, &called, ctx.runtime, &child_env, ctx.verbose).await?;
+        for r in &results {
+            if r.status == JobStatus::Failure {
+                any_failed = true;
+            }
+        }
+        all_results.extend(results);
+    }
+
+    // Summarize into a single JobResult
+    let mut logs = String::new();
+    logs.push_str(&format!("Called workflow: {}\n", workflow_path.display()));
+    for r in &all_results {
+        logs.push_str(&format!("- {}: {:?}\n", r.name, r.status));
+    }
+
+    // Represent as one summary step for UI
+    let summary_step = StepResult {
+        name: format!("Run reusable workflow: {}", uses),
+        status: if any_failed {
+            StepStatus::Failure
+        } else {
+            StepStatus::Success
+        },
+        output: logs.clone(),
+    };
+
+    Ok(JobResult {
+        name: ctx.job_name.to_string(),
+        status: if any_failed {
+            JobStatus::Failure
+        } else {
+            JobStatus::Success
+        },
+        steps: vec![summary_step],
+        logs,
+    })
 }
 
 #[allow(dead_code)]
