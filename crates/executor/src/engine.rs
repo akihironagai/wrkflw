@@ -98,6 +98,7 @@ async fn execute_github_workflow(
         "WRKFLW_RUNTIME_MODE".to_string(),
         match config.runtime_type {
             RuntimeType::Emulation => "emulation".to_string(),
+            RuntimeType::SecureEmulation => "secure_emulation".to_string(),
             RuntimeType::Docker => "docker".to_string(),
             RuntimeType::Podman => "podman".to_string(),
         },
@@ -198,6 +199,7 @@ async fn execute_gitlab_pipeline(
         "WRKFLW_RUNTIME_MODE".to_string(),
         match config.runtime_type {
             RuntimeType::Emulation => "emulation".to_string(),
+            RuntimeType::SecureEmulation => "secure_emulation".to_string(),
             RuntimeType::Docker => "docker".to_string(),
             RuntimeType::Podman => "podman".to_string(),
         },
@@ -400,6 +402,9 @@ fn initialize_runtime(
             }
         }
         RuntimeType::Emulation => Ok(Box::new(emulation::EmulationRuntime::new())),
+        RuntimeType::SecureEmulation => Ok(Box::new(
+            wrkflw_runtime::secure_emulation::SecureEmulationRuntime::new(),
+        )),
     }
 }
 
@@ -408,6 +413,7 @@ pub enum RuntimeType {
     Docker,
     Podman,
     Emulation,
+    SecureEmulation,
 }
 
 #[derive(Debug, Clone)]

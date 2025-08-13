@@ -41,7 +41,8 @@ pub fn render_status_bar(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App,
             .bg(match app.runtime_type {
                 RuntimeType::Docker => Color::Blue,
                 RuntimeType::Podman => Color::Cyan,
-                RuntimeType::Emulation => Color::Magenta,
+                RuntimeType::SecureEmulation => Color::Green,
+                RuntimeType::Emulation => Color::Red,
             })
             .fg(Color::White),
     ));
@@ -106,6 +107,12 @@ pub fn render_status_bar(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App,
                         Color::Red
                     })
                     .fg(Color::White),
+            ));
+        }
+        RuntimeType::SecureEmulation => {
+            status_items.push(Span::styled(
+                " 🔒SECURE ",
+                Style::default().bg(Color::Green).fg(Color::White),
             ));
         }
         RuntimeType::Emulation => {

@@ -10,8 +10,10 @@ enum RuntimeChoice {
     Docker,
     /// Use Podman containers for isolation
     Podman,
-    /// Use process emulation mode (no containers)
+    /// Use process emulation mode (no containers, UNSAFE)
     Emulation,
+    /// Use secure emulation mode with sandboxing (recommended for untrusted code)
+    SecureEmulation,
 }
 
 impl From<RuntimeChoice> for wrkflw_executor::RuntimeType {
@@ -20,6 +22,7 @@ impl From<RuntimeChoice> for wrkflw_executor::RuntimeType {
             RuntimeChoice::Docker => wrkflw_executor::RuntimeType::Docker,
             RuntimeChoice::Podman => wrkflw_executor::RuntimeType::Podman,
             RuntimeChoice::Emulation => wrkflw_executor::RuntimeType::Emulation,
+            RuntimeChoice::SecureEmulation => wrkflw_executor::RuntimeType::SecureEmulation,
         }
     }
 }
@@ -70,7 +73,7 @@ enum Commands {
         /// Path to workflow/pipeline file to execute
         path: PathBuf,
 
-        /// Container runtime to use (docker, podman, emulation)
+        /// Container runtime to use (docker, podman, emulation, secure-emulation)
         #[arg(short, long, value_enum, default_value = "docker")]
         runtime: RuntimeChoice,
 
@@ -92,7 +95,7 @@ enum Commands {
         /// Path to workflow file or directory (defaults to .github/workflows)
         path: Option<PathBuf>,
 
-        /// Container runtime to use (docker, podman, emulation)
+        /// Container runtime to use (docker, podman, emulation, secure-emulation)
         #[arg(short, long, value_enum, default_value = "docker")]
         runtime: RuntimeChoice,
 

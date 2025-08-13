@@ -122,6 +122,7 @@ pub async fn execute_workflow_cli(
                 RuntimeType::Podman
             }
         }
+        RuntimeType::SecureEmulation => RuntimeType::SecureEmulation,
         RuntimeType::Emulation => RuntimeType::Emulation,
     };
 
@@ -454,6 +455,7 @@ pub fn start_next_workflow_execution(
                     RuntimeType::Podman
                 }
             }
+            RuntimeType::SecureEmulation => RuntimeType::SecureEmulation,
             RuntimeType::Emulation => RuntimeType::Emulation,
         };
 

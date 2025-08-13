@@ -443,19 +443,28 @@ jobs:
 ### Runtime Mode Differences
 - **Docker Mode**: Provides the closest match to GitHub's environment, including support for Docker container actions, service containers, and Linux-based jobs. Some advanced container configurations may still require manual setup.
 - **Podman Mode**: Similar to Docker mode but uses Podman for container execution. Offers rootless container support and enhanced security. Fully compatible with Docker-based workflows.
-- **Emulation Mode**: Runs workflows using the local system tools. Limitations:
+- **🔒 Secure Emulation Mode**: Runs workflows on the local system with comprehensive sandboxing for security. **Recommended for local development**:
+  - Command validation and filtering (blocks dangerous commands like `rm -rf /`, `sudo`, etc.)
+  - Resource limits (CPU, memory, execution time)
+  - Filesystem access controls
+  - Process monitoring and limits
+  - Safe for running untrusted workflows locally
+- **⚠️ Emulation Mode (Legacy)**: Runs workflows using local system tools without sandboxing. **Not recommended - use Secure Emulation instead**:
   - Only supports local and JavaScript actions (no Docker container actions)
   - No support for service containers
   - No caching support
+  - **No security protections - can execute harmful commands**
   - Some actions may require adaptation to work locally
-  - Special action handling is more limited
 
 ### Best Practices
-- Test workflows in both Docker and emulation modes to ensure compatibility
+- **Use Secure Emulation mode for local development** - provides safety without container overhead
+- Test workflows in multiple runtime modes to ensure compatibility
+- **Use Docker/Podman mode for production** - provides maximum isolation and reproducibility
 - Keep matrix builds reasonably sized for better performance
 - Use environment variables instead of GitHub secrets when possible
 - Consider using local actions for complex custom functionality
-- Test network-dependent actions carefully in both modes
+- **Review security warnings** - pay attention to blocked commands in secure emulation mode
+- **Start with secure mode** - only fall back to legacy emulation if necessary
 
 ## Roadmap
 
