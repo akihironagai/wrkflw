@@ -111,6 +111,12 @@ wrkflw validate path/to/workflow.yml
 # Validate workflows in a specific directory
 wrkflw validate path/to/workflows
 
+# Validate multiple files and/or directories (GitHub and GitLab are auto-detected)
+wrkflw validate path/to/flow-1.yml path/to/flow-2.yml path/to/workflows
+
+# Force GitLab parsing for all provided paths
+wrkflw validate --gitlab .gitlab-ci.yml other.gitlab-ci.yml
+
 # Validate with verbose output
 wrkflw validate --verbose path/to/workflow.yml
 

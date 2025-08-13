@@ -48,8 +48,9 @@ struct Wrkflw {
 enum Commands {
     /// Validate workflow or pipeline files
     Validate {
-        /// Path to workflow/pipeline file or directory (defaults to .github/workflows)
-        path: Option<PathBuf>,
+        /// Path(s) to workflow/pipeline file(s) or directory(ies) (defaults to .github/workflows if none provided)
+        #[arg(value_name = "path", num_args = 0..)]
+        paths: Vec<PathBuf>,
 
         /// Explicitly validate as GitLab CI/CD pipeline
         #[arg(long)]
@@ -266,6 +267,28 @@ fn is_gitlab_pipeline(path: &Path) -> bool {
 
 #[tokio::main]
 async fn main() {
+    // Gracefully handle Broken pipe (EPIPE) when output is piped (e.g., to `head`)
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let mut is_broken_pipe = false;
+        if let Some(s) = info.payload().downcast_ref::<&str>() {
+            if s.contains("Broken pipe") {
+                is_broken_pipe = true;
+            }
+        }
+        if let Some(s) = info.payload().downcast_ref::<String>() {
+            if s.contains("Broken pipe") {
+                is_broken_pipe = true;
+            }
+        }
+        if is_broken_pipe {
+            // Treat as a successful, short-circuited exit
+            std::process::exit(0);
+        }
+        // Fallback to the default hook for all other panics
+        default_panic_hook(info);
+    }));
+
     let cli = Wrkflw::parse();
     let verbose = cli.verbose;
     let debug = cli.debug;
@@ -286,65 +309,78 @@ async fn main() {
 
     match &cli.command {
         Some(Commands::Validate {
-            path,
+            paths,
             gitlab,
             exit_code,
             no_exit_code,
         }) => {
-            // Determine the path to validate
-            let validate_path = path
-                .clone()
-                .unwrap_or_else(|| PathBuf::from(".github/workflows"));
-
-            // Check if the path exists
-            if !validate_path.exists() {
-                eprintln!("Error: Path does not exist: {}", validate_path.display());
-                std::process::exit(1);
-            }
+            // Determine the paths to validate (default to .github/workflows when none provided)
+            let validate_paths: Vec<PathBuf> = if paths.is_empty() {
+                vec![PathBuf::from(".github/workflows")]
+            } else {
+                paths.clone()
+            };
 
             // Determine if we're validating a GitLab pipeline based on the --gitlab flag or file detection
             let force_gitlab = *gitlab;
             let mut validation_failed = false;
 
-            if validate_path.is_dir() {
-                // Validate all workflow files in the directory
-                let entries = std::fs::read_dir(&validate_path)
-                    .expect("Failed to read directory")
-                    .filter_map(|entry| entry.ok())
-                    .filter(|entry| {
-                        entry.path().is_file()
-                            && entry
-                                .path()
-                                .extension()
-                                .is_some_and(|ext| ext == "yml" || ext == "yaml")
-                    })
-                    .collect::<Vec<_>>();
+            for validate_path in validate_paths {
+                // Check if the path exists; if not, mark failure but continue
+                if !validate_path.exists() {
+                    eprintln!("Error: Path does not exist: {}", validate_path.display());
+                    validation_failed = true;
+                    continue;
+                }
 
-                println!("Validating {} workflow file(s)...", entries.len());
+                if validate_path.is_dir() {
+                    // Validate all workflow files in the directory
+                    let entries = std::fs::read_dir(&validate_path)
+                        .expect("Failed to read directory")
+                        .filter_map(|entry| entry.ok())
+                        .filter(|entry| {
+                            entry.path().is_file()
+                                && entry
+                                    .path()
+                                    .extension()
+                                    .is_some_and(|ext| ext == "yml" || ext == "yaml")
+                        })
+                        .collect::<Vec<_>>();
 
-                for entry in entries {
-                    let path = entry.path();
-                    let is_gitlab = force_gitlab || is_gitlab_pipeline(&path);
+                    println!(
+                        "Validating {} workflow file(s) in {}...",
+                        entries.len(),
+                        validate_path.display()
+                    );
+
+                    for entry in entries {
+                        let path = entry.path();
+                        let is_gitlab = force_gitlab || is_gitlab_pipeline(&path);
+
+                        let file_failed = if is_gitlab {
+                            validate_gitlab_pipeline(&path, verbose)
+                        } else {
+                            validate_github_workflow(&path, verbose)
+                        };
+
+                        if file_failed {
+                            validation_failed = true;
+                        }
+                    }
+                } else {
+                    // Validate a single workflow file
+                    let is_gitlab = force_gitlab || is_gitlab_pipeline(&validate_path);
 
                     let file_failed = if is_gitlab {
-                        validate_gitlab_pipeline(&path, verbose)
+                        validate_gitlab_pipeline(&validate_path, verbose)
                     } else {
-                        validate_github_workflow(&path, verbose)
+                        validate_github_workflow(&validate_path, verbose)
                     };
 
                     if file_failed {
                         validation_failed = true;
                     }
                 }
-            } else {
-                // Validate a single workflow file
-                let is_gitlab = force_gitlab || is_gitlab_pipeline(&validate_path);
-
-                validation_failed = if is_gitlab {
-                    validate_gitlab_pipeline(&validate_path, verbose)
-                } else {
-                    validate_github_workflow(&validate_path, verbose)
-                };
             }
 
             // Set exit code if validation failed and exit_code flag is true (and no_exit_code is false)
