@@ -26,6 +26,26 @@ where
     }
 }
 
+// Custom deserializer for runs-on field that handles both string and array formats
+fn deserialize_runs_on<'de, D>(deserializer: D) -> Result<Option<Vec<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrVec {
+        String(String),
+        Vec(Vec<String>),
+    }
+
+    let value = Option::<StringOrVec>::deserialize(deserializer)?;
+    match value {
+        Some(StringOrVec::String(s)) => Ok(Some(vec![s])),
+        Some(StringOrVec::Vec(v)) => Ok(Some(v)),
+        None => Ok(None),
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WorkflowDefinition {
     pub name: String,
@@ -38,8 +58,8 @@ pub struct WorkflowDefinition {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Job {
-    #[serde(rename = "runs-on")]
-    pub runs_on: Option<String>,
+    #[serde(rename = "runs-on", default, deserialize_with = "deserialize_runs_on")]
+    pub runs_on: Option<Vec<String>>,
     #[serde(default, deserialize_with = "deserialize_needs")]
     pub needs: Option<Vec<String>>,
     #[serde(default)]

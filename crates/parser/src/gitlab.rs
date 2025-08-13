@@ -130,7 +130,7 @@ pub fn convert_to_workflow_format(pipeline: &Pipeline) -> workflow::WorkflowDefi
 
         // Create a new job
         let mut job = workflow::Job {
-            runs_on: Some("ubuntu-latest".to_string()), // Default runner
+            runs_on: Some(vec!["ubuntu-latest".to_string()]), // Default runner
             needs: None,
             steps: Vec::new(),
             env: HashMap::new(),
