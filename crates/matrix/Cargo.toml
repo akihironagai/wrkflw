@@ -12,7 +12,7 @@ categories.workspace = true
 
 [dependencies]
 # Internal crates
-wrkflw-models = { path = "../models", version = "0.6.0" }
+wrkflw-models = { path = "../models", version = "0.7.0" }
 
 # External dependencies
 indexmap.workspace = true
