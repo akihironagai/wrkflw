@@ -42,6 +42,9 @@ pub struct App {
     pub log_search_matches: Vec<usize>, // Indices of logs that match the search
     pub log_search_match_idx: usize, // Current match index for navigation
 
+    // Help tab scrolling
+    pub help_scroll: usize, // Scrolling position for help content
+
     // Background log processing
     pub log_processor: LogProcessor,
     pub processed_logs: Vec<ProcessedLogEntry>,
@@ -207,6 +210,7 @@ impl App {
             log_filter_level: Some(LogFilterLevel::All),
             log_search_matches: Vec::new(),
             log_search_match_idx: 0,
+            help_scroll: 0,
 
             // Background log processing
             log_processor: LogProcessor::new(),
@@ -805,6 +809,18 @@ impl App {
         if total_logs > 0 {
             self.log_scroll = (self.log_scroll + 1).min(total_logs - 1);
         }
+    }
+
+    // Scroll help content up
+    pub fn scroll_help_up(&mut self) {
+        self.help_scroll = self.help_scroll.saturating_sub(1);
+    }
+
+    // Scroll help content down
+    pub fn scroll_help_down(&mut self) {
+        // The help content has a fixed number of lines, so we set a reasonable max
+        const MAX_HELP_SCROLL: usize = 30; // Adjust based on help content length
+        self.help_scroll = (self.help_scroll + 1).min(MAX_HELP_SCROLL);
     }
 
     // Update progress for running workflows

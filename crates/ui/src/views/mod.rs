@@ -15,7 +15,7 @@ use std::io;
 pub fn render_ui(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &mut App) {
     // Check if help should be shown as an overlay
     if app.show_help {
-        help_overlay::render_help_overlay(f);
+        help_overlay::render_help_overlay(f, app.help_scroll);
         return;
     }
 
@@ -48,7 +48,7 @@ pub fn render_ui(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &mut App) {
             }
         }
         2 => logs_tab::render_logs_tab(f, app, main_chunks[1]),
-        3 => help_overlay::render_help_tab(f, main_chunks[1]),
+        3 => help_overlay::render_help_content(f, main_chunks[1], app.help_scroll),
         _ => {}
     }
 

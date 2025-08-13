@@ -181,7 +181,7 @@ pub fn render_status_bar(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App,
                 "[No logs to display]"
             }
         }
-        3 => "[?] Toggle help overlay",
+        3 => "[↑/↓] Scroll help   [?] Toggle help overlay",
         _ => "",
     };
     status_items.push(Span::styled(
