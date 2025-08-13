@@ -1762,9 +1762,13 @@ fn get_runner_image(runs_on: &str) -> String {
     .to_string()
 }
 
-fn get_runner_image_from_opt(runs_on: &Option<String>) -> String {
+fn get_runner_image_from_opt(runs_on: &Option<Vec<String>>) -> String {
     let default = "ubuntu-latest";
-    let ro = runs_on.as_deref().unwrap_or(default);
+    let ro = runs_on
+        .as_ref()
+        .and_then(|vec| vec.first())
+        .map(|s| s.as_str())
+        .unwrap_or(default);
     get_runner_image(ro)
 }
 
