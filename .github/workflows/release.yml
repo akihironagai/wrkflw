@@ -42,7 +42,30 @@ jobs:
           cargo install git-cliff --force
       
       - name: Generate Changelog
-        run: git-cliff --latest --output CHANGELOG.md
+        run: |
+          # Debug: Show current state
+          echo "Current ref: ${{ github.ref_name }}"
+          echo "Input version: ${{ github.event.inputs.version }}"
+          echo "All tags:"
+          git tag --sort=-version:refname | head -10
+          
+          # Generate changelog from the current tag to the previous version tag
+          CURRENT_TAG="${{ github.event.inputs.version || github.ref_name }}"
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep "^v" | head -2 | tail -1)
+          
+          echo "Current tag: $CURRENT_TAG"
+          echo "Previous tag: $PREVIOUS_TAG"
+          
+          if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
+            echo "Generating changelog for range: $PREVIOUS_TAG..$CURRENT_TAG"
+            git-cliff --tag "$CURRENT_TAG" "$PREVIOUS_TAG..$CURRENT_TAG" --output CHANGELOG.md
+          else
+            echo "Generating latest changelog for tag: $CURRENT_TAG"
+            git-cliff --tag "$CURRENT_TAG" --latest --output CHANGELOG.md
+          fi
+          
+          echo "Generated changelog:"
+          cat CHANGELOG.md
       
       - name: Create Release
         id: create_release
