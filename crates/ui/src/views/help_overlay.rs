@@ -10,7 +10,11 @@ use ratatui::{
 use std::io;
 
 // Render the help tab with scroll support
-pub fn render_help_content(f: &mut Frame<CrosstermBackend<io::Stdout>>, area: Rect, scroll_offset: usize) {
+pub fn render_help_content(
+    f: &mut Frame<CrosstermBackend<io::Stdout>>,
+    area: Rect,
+    scroll_offset: usize,
+) {
     // Split the area into columns for better organization
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
