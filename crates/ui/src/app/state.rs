@@ -175,6 +175,7 @@ impl App {
                 }
             }
             RuntimeType::Emulation => RuntimeType::Emulation,
+            RuntimeType::SecureEmulation => RuntimeType::SecureEmulation,
         };
 
         App {
@@ -227,7 +228,8 @@ impl App {
     pub fn toggle_emulation_mode(&mut self) {
         self.runtime_type = match self.runtime_type {
             RuntimeType::Docker => RuntimeType::Podman,
-            RuntimeType::Podman => RuntimeType::Emulation,
+            RuntimeType::Podman => RuntimeType::SecureEmulation,
+            RuntimeType::SecureEmulation => RuntimeType::Emulation,
             RuntimeType::Emulation => RuntimeType::Docker,
         };
         self.logs
@@ -251,7 +253,8 @@ impl App {
         match self.runtime_type {
             RuntimeType::Docker => "Docker",
             RuntimeType::Podman => "Podman",
-            RuntimeType::Emulation => "Emulation",
+            RuntimeType::SecureEmulation => "Secure Emulation",
+            RuntimeType::Emulation => "Emulation (Unsafe)",
         }
     }
 

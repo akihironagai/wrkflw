@@ -24,6 +24,7 @@ pub trait ContainerRuntime {
     ) -> Result<String, ContainerError>;
 }
 
+#[derive(Debug)]
 pub struct ContainerOutput {
     pub stdout: String,
     pub stderr: String,
