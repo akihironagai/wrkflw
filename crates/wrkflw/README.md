@@ -26,6 +26,9 @@ wrkflw validate
 wrkflw validate .github/workflows/ci.yml
 wrkflw validate path/to/workflows
 
+# Validate multiple files and/or directories
+wrkflw validate path/to/flow-1.yml path/to/flow-2.yml path/to/workflows
+
 # Run a workflow (Docker by default)
 wrkflw run .github/workflows/ci.yml
 
@@ -40,10 +43,11 @@ wrkflw tui --runtime podman
 
 ### Commands
 
-- **validate**: Validate a workflow/pipeline file or directory
+- **validate**: Validate workflow/pipeline files and/or directories
   - GitHub (default): `.github/workflows/*.yml`
   - GitLab: `.gitlab-ci.yml` or files ending with `gitlab-ci.yml`
-  - Exit code behavior (by default): `1` when validation failures are detected
+  - Accepts multiple paths in a single invocation
+  - Exit code behavior (by default): `1` when any validation failure is detected
   - Flags: `--gitlab`, `--exit-code`, `--no-exit-code`, `--verbose`
 
 - **run**: Execute a workflow or pipeline locally
