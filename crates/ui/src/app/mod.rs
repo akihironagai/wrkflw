@@ -189,6 +189,25 @@ fn run_tui_event_loop(
                     continue;
                 }
 
+                // Handle help overlay scrolling
+                if app.show_help {
+                    match key.code {
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            app.scroll_help_up();
+                            continue;
+                        }
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            app.scroll_help_down();
+                            continue;
+                        }
+                        KeyCode::Esc | KeyCode::Char('?') => {
+                            app.show_help = false;
+                            continue;
+                        }
+                        _ => {}
+                    }
+                }
+
                 match key.code {
                     KeyCode::Char('q') => {
                         // Exit and clean up
@@ -223,6 +242,8 @@ fn run_tui_event_loop(
                             } else {
                                 app.scroll_logs_up();
                             }
+                        } else if app.selected_tab == 3 {
+                            app.scroll_help_up();
                         } else if app.selected_tab == 0 {
                             app.previous_workflow();
                         } else if app.selected_tab == 1 {
@@ -240,6 +261,8 @@ fn run_tui_event_loop(
                             } else {
                                 app.scroll_logs_down();
                             }
+                        } else if app.selected_tab == 3 {
+                            app.scroll_help_down();
                         } else if app.selected_tab == 0 {
                             app.next_workflow();
                         } else if app.selected_tab == 1 {
