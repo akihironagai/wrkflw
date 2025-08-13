@@ -1,4 +1,5 @@
 // App state for the UI
+use crate::log_processor::{LogProcessingRequest, LogProcessor, ProcessedLogEntry};
 use crate::models::{
     ExecutionResultMsg, JobExecution, LogFilterLevel, StepExecution, Workflow, WorkflowExecution,
     WorkflowStatus,
@@ -40,6 +41,12 @@ pub struct App {
     pub log_filter_level: Option<LogFilterLevel>, // Current log level filter
     pub log_search_matches: Vec<usize>, // Indices of logs that match the search
     pub log_search_match_idx: usize, // Current match index for navigation
+
+    // Background log processing
+    pub log_processor: LogProcessor,
+    pub processed_logs: Vec<ProcessedLogEntry>,
+    pub logs_need_update: bool,        // Flag to trigger log processing
+    pub last_system_logs_count: usize, // Track system log changes
 }
 
 impl App {
@@ -199,6 +206,12 @@ impl App {
             log_filter_level: Some(LogFilterLevel::All),
             log_search_matches: Vec::new(),
             log_search_match_idx: 0,
+
+            // Background log processing
+            log_processor: LogProcessor::new(),
+            processed_logs: Vec::new(),
+            logs_need_update: true,
+            last_system_logs_count: 0,
         }
     }
 
@@ -429,10 +442,9 @@ impl App {
         if let Some(idx) = self.workflow_list_state.selected() {
             if idx < self.workflows.len() && !self.execution_queue.contains(&idx) {
                 self.execution_queue.push(idx);
-                let timestamp = Local::now().format("%H:%M:%S").to_string();
-                self.logs.push(format!(
-                    "[{}] Added '{}' to execution queue. Press 'Enter' to start.",
-                    timestamp, self.workflows[idx].name
+                self.add_timestamped_log(&format!(
+                    "Added '{}' to execution queue. Press 'Enter' to start.",
+                    self.workflows[idx].name
                 ));
             }
         }
@@ -635,10 +647,11 @@ impl App {
                 self.log_search_active = false;
                 self.log_search_query.clear();
                 self.log_search_matches.clear();
+                self.mark_logs_for_update();
             }
             KeyCode::Backspace => {
                 self.log_search_query.pop();
-                self.update_log_search_matches();
+                self.mark_logs_for_update();
             }
             KeyCode::Enter => {
                 self.log_search_active = false;
@@ -646,7 +659,7 @@ impl App {
             }
             KeyCode::Char(c) => {
                 self.log_search_query.push(c);
-                self.update_log_search_matches();
+                self.mark_logs_for_update();
             }
             _ => {}
         }
@@ -658,8 +671,8 @@ impl App {
         if !self.log_search_active {
             // Don't clear the query, this allows toggling the search UI while keeping the filter
         } else {
-            // When activating search, update matches
-            self.update_log_search_matches();
+            // When activating search, trigger update
+            self.mark_logs_for_update();
         }
     }
 
@@ -670,8 +683,8 @@ impl App {
             Some(level) => Some(level.next()),
         };
 
-        // Update search matches when filter changes
-        self.update_log_search_matches();
+        // Trigger log processing update when filter changes
+        self.mark_logs_for_update();
     }
 
     // Clear log search and filter
@@ -680,6 +693,7 @@ impl App {
         self.log_filter_level = None;
         self.log_search_matches.clear();
         self.log_search_match_idx = 0;
+        self.mark_logs_for_update();
     }
 
     // Update matches based on current search and filter
@@ -954,5 +968,83 @@ impl App {
                 self.set_status_message(format!("✅ Workflow '{}' has been reset!", workflow_name));
             }
         }
+    }
+
+    /// Request log processing update from background thread
+    pub fn request_log_processing_update(&mut self) {
+        let request = LogProcessingRequest {
+            search_query: self.log_search_query.clone(),
+            filter_level: self.log_filter_level.clone(),
+            app_logs: self.logs.clone(),
+            app_logs_count: self.logs.len(),
+            system_logs_count: wrkflw_logging::get_logs().len(),
+        };
+
+        if self.log_processor.request_update(request).is_err() {
+            // Log processor channel disconnected, recreate it
+            self.log_processor = LogProcessor::new();
+            self.logs_need_update = true;
+        }
+    }
+
+    /// Check for and apply log processing updates
+    pub fn check_log_processing_updates(&mut self) {
+        // Check if system logs have changed
+        let current_system_logs_count = wrkflw_logging::get_logs().len();
+        if current_system_logs_count != self.last_system_logs_count {
+            self.last_system_logs_count = current_system_logs_count;
+            self.mark_logs_for_update();
+        }
+
+        if let Some(response) = self.log_processor.try_get_update() {
+            self.processed_logs = response.processed_logs;
+            self.log_search_matches = response.search_matches;
+
+            // Update scroll position to first match if we have search results
+            if !self.log_search_matches.is_empty() && !self.log_search_query.is_empty() {
+                self.log_search_match_idx = 0;
+                if let Some(&idx) = self.log_search_matches.first() {
+                    self.log_scroll = idx;
+                }
+            }
+
+            self.logs_need_update = false;
+        }
+    }
+
+    /// Trigger log processing when search/filter changes
+    pub fn mark_logs_for_update(&mut self) {
+        self.logs_need_update = true;
+        self.request_log_processing_update();
+    }
+
+    /// Get combined app and system logs for background processing
+    pub fn get_combined_logs(&self) -> Vec<String> {
+        let mut all_logs = Vec::new();
+
+        // Add app logs
+        for log in &self.logs {
+            all_logs.push(log.clone());
+        }
+
+        // Add system logs
+        for log in wrkflw_logging::get_logs() {
+            all_logs.push(log.clone());
+        }
+
+        all_logs
+    }
+
+    /// Add a log entry and trigger log processing update
+    pub fn add_log(&mut self, message: String) {
+        self.logs.push(message);
+        self.mark_logs_for_update();
+    }
+
+    /// Add a formatted log entry with timestamp and trigger log processing update
+    pub fn add_timestamped_log(&mut self, message: &str) {
+        let timestamp = Local::now().format("%H:%M:%S").to_string();
+        let formatted_message = format!("[{}] {}", timestamp, message);
+        self.add_log(formatted_message);
     }
 }

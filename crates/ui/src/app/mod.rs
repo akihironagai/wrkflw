@@ -154,6 +154,15 @@ fn run_tui_event_loop(
         if last_tick.elapsed() >= tick_rate {
             app.tick();
             app.update_running_workflow_progress();
+
+            // Check for log processing updates (includes system log change detection)
+            app.check_log_processing_updates();
+
+            // Request log processing if needed
+            if app.logs_need_update {
+                app.request_log_processing_update();
+            }
+
             last_tick = Instant::now();
         }
 

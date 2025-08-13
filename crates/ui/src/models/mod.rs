@@ -50,6 +50,7 @@ pub struct StepExecution {
 }
 
 /// Log filter levels
+#[derive(Debug, Clone, PartialEq)]
 pub enum LogFilterLevel {
     Info,
     Warning,
