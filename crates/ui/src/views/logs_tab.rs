@@ -140,45 +140,8 @@ pub fn render_logs_tab(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App, a
         f.render_widget(search_block, chunks[1]);
     }
 
-    // Combine application logs with system logs
-    let mut all_logs = Vec::new();
-
-    // Now all logs should have timestamps in the format [HH:MM:SS]
-
-    // Process app logs
-    for log in &app.logs {
-        all_logs.push(log.clone());
-    }
-
-    // Process system logs
-    for log in wrkflw_logging::get_logs() {
-        all_logs.push(log.clone());
-    }
-
-    // Filter logs based on search query and filter level
-    let filtered_logs = if !app.log_search_query.is_empty() || app.log_filter_level.is_some() {
-        all_logs
-            .iter()
-            .filter(|log| {
-                let passes_filter = match &app.log_filter_level {
-                    None => true,
-                    Some(level) => level.matches(log),
-                };
-
-                let matches_search = if app.log_search_query.is_empty() {
-                    true
-                } else {
-                    log.to_lowercase()
-                        .contains(&app.log_search_query.to_lowercase())
-                };
-
-                passes_filter && matches_search
-            })
-            .cloned()
-            .collect::<Vec<String>>()
-    } else {
-        all_logs.clone() // Clone to avoid moving all_logs
-    };
+    // Use processed logs from background thread instead of processing on every frame
+    let filtered_logs = &app.processed_logs;
 
     // Create a table for logs for better organization
     let header_cells = ["Time", "Type", "Message"]
@@ -189,109 +152,10 @@ pub fn render_logs_tab(f: &mut Frame<CrosstermBackend<io::Stdout>>, app: &App, a
         .style(Style::default().add_modifier(Modifier::BOLD))
         .height(1);
 
-    let rows = filtered_logs.iter().map(|log_line| {
-        // Parse log line to extract timestamp, type and message
-
-        // Extract timestamp from log format [HH:MM:SS]
-        let timestamp = if log_line.starts_with('[') && log_line.contains(']') {
-            let end = log_line.find(']').unwrap_or(0);
-            if end > 1 {
-                log_line[1..end].to_string()
-            } else {
-                "??:??:??".to_string() // Show placeholder for malformed logs
-            }
-        } else {
-            "??:??:??".to_string() // Show placeholder for malformed logs
-        };
-
-        let (log_type, log_style, _) =
-            if log_line.contains("Error") || log_line.contains("error") || log_line.contains("❌")
-            {
-                ("ERROR", Style::default().fg(Color::Red), log_line.as_str())
-            } else if log_line.contains("Warning")
-                || log_line.contains("warning")
-                || log_line.contains("⚠️")
-            {
-                (
-                    "WARN",
-                    Style::default().fg(Color::Yellow),
-                    log_line.as_str(),
-                )
-            } else if log_line.contains("Success")
-                || log_line.contains("success")
-                || log_line.contains("✅")
-            {
-                (
-                    "SUCCESS",
-                    Style::default().fg(Color::Green),
-                    log_line.as_str(),
-                )
-            } else if log_line.contains("Running")
-                || log_line.contains("running")
-                || log_line.contains("⟳")
-            {
-                ("INFO", Style::default().fg(Color::Cyan), log_line.as_str())
-            } else if log_line.contains("Triggering") || log_line.contains("triggered") {
-                (
-                    "TRIG",
-                    Style::default().fg(Color::Magenta),
-                    log_line.as_str(),
-                )
-            } else {
-                ("INFO", Style::default().fg(Color::Gray), log_line.as_str())
-            };
-
-        // Extract content after timestamp
-        let content = if log_line.starts_with('[') && log_line.contains(']') {
-            let start = log_line.find(']').unwrap_or(0) + 1;
-            log_line[start..].trim()
-        } else {
-            log_line.as_str()
-        };
-
-        // Highlight search matches in content if search is active
-        let mut content_spans = Vec::new();
-        if !app.log_search_query.is_empty() {
-            let lowercase_content = content.to_lowercase();
-            let lowercase_query = app.log_search_query.to_lowercase();
-
-            if lowercase_content.contains(&lowercase_query) {
-                let mut last_idx = 0;
-                while let Some(idx) = lowercase_content[last_idx..].find(&lowercase_query) {
-                    let real_idx = last_idx + idx;
-
-                    // Add text before match
-                    if real_idx > last_idx {
-                        content_spans.push(Span::raw(content[last_idx..real_idx].to_string()));
-                    }
-
-                    // Add matched text with highlight
-                    let match_end = real_idx + app.log_search_query.len();
-                    content_spans.push(Span::styled(
-                        content[real_idx..match_end].to_string(),
-                        Style::default().bg(Color::Yellow).fg(Color::Black),
-                    ));
-
-                    last_idx = match_end;
-                }
-
-                // Add remaining text after last match
-                if last_idx < content.len() {
-                    content_spans.push(Span::raw(content[last_idx..].to_string()));
-                }
-            } else {
-                content_spans.push(Span::raw(content));
-            }
-        } else {
-            content_spans.push(Span::raw(content));
-        }
-
-        Row::new(vec![
-            Cell::from(timestamp),
-            Cell::from(log_type).style(log_style),
-            Cell::from(Line::from(content_spans)),
-        ])
-    });
+    // Convert processed logs to table rows - this is now very fast since logs are pre-processed
+    let rows = filtered_logs
+        .iter()
+        .map(|processed_log| processed_log.to_row());
 
     let content_idx = if show_search_bar { 2 } else { 1 };
 

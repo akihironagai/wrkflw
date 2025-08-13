@@ -12,6 +12,7 @@
 pub mod app;
 pub mod components;
 pub mod handlers;
+pub mod log_processor;
 pub mod models;
 pub mod utils;
 pub mod views;
