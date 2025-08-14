@@ -403,6 +403,7 @@ async fn main() {
                 runtime_type: runtime.clone().into(),
                 verbose,
                 preserve_containers_on_failure: *preserve_containers_on_failure,
+                secrets_config: None, // Use default secrets configuration
             };
 
             // Check if we're explicitly or implicitly running a GitLab pipeline
