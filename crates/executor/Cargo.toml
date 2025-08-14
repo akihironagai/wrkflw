@@ -17,6 +17,7 @@ wrkflw-parser = { path = "../parser", version = "0.7.0" }
 wrkflw-runtime = { path = "../runtime", version = "0.7.0" }
 wrkflw-logging = { path = "../logging", version = "0.7.0" }
 wrkflw-matrix = { path = "../matrix", version = "0.7.0" }
+wrkflw-secrets = { path = "../secrets", version = "0.7.0" }
 wrkflw-utils = { path = "../utils", version = "0.7.0" }
 
 # External dependencies

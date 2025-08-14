@@ -20,6 +20,7 @@ use wrkflw_parser::gitlab::{self, parse_pipeline};
 use wrkflw_parser::workflow::{self, parse_workflow, ActionInfo, Job, WorkflowDefinition};
 use wrkflw_runtime::container::ContainerRuntime;
 use wrkflw_runtime::emulation;
+use wrkflw_secrets::{SecretConfig, SecretManager, SecretMasker, SecretSubstitution};
 
 #[allow(unused_variables, unused_assignments)]
 /// Execute a GitHub Actions workflow file locally
@@ -115,7 +116,27 @@ async fn execute_github_workflow(
         ExecutionError::Execution(format!("Failed to setup GitHub env files: {}", e))
     })?;
 
-    // 5. Execute jobs according to the plan
+    // 5. Initialize secrets management
+    let secret_manager = if let Some(secrets_config) = &config.secrets_config {
+        Some(
+            SecretManager::new(secrets_config.clone())
+                .await
+                .map_err(|e| {
+                    ExecutionError::Execution(format!("Failed to initialize secret manager: {}", e))
+                })?,
+        )
+    } else {
+        Some(SecretManager::default().await.map_err(|e| {
+            ExecutionError::Execution(format!(
+                "Failed to initialize default secret manager: {}",
+                e
+            ))
+        })?)
+    };
+
+    let secret_masker = SecretMasker::new();
+
+    // 6. Execute jobs according to the plan
     let mut results = Vec::new();
     let mut has_failures = false;
     let mut failure_details = String::new();
@@ -128,6 +149,8 @@ async fn execute_github_workflow(
             runtime.as_ref(),
             &env_context,
             config.verbose,
+            secret_manager.as_ref(),
+            Some(&secret_masker),
         )
         .await?;
 
@@ -210,7 +233,27 @@ async fn execute_gitlab_pipeline(
         ExecutionError::Execution(format!("Failed to setup environment files: {}", e))
     })?;
 
-    // 6. Execute jobs according to the plan
+    // 6. Initialize secrets management
+    let secret_manager = if let Some(secrets_config) = &config.secrets_config {
+        Some(
+            SecretManager::new(secrets_config.clone())
+                .await
+                .map_err(|e| {
+                    ExecutionError::Execution(format!("Failed to initialize secret manager: {}", e))
+                })?,
+        )
+    } else {
+        Some(SecretManager::default().await.map_err(|e| {
+            ExecutionError::Execution(format!(
+                "Failed to initialize default secret manager: {}",
+                e
+            ))
+        })?)
+    };
+
+    let secret_masker = SecretMasker::new();
+
+    // 7. Execute jobs according to the plan
     let mut results = Vec::new();
     let mut has_failures = false;
     let mut failure_details = String::new();
@@ -223,6 +266,8 @@ async fn execute_gitlab_pipeline(
             runtime.as_ref(),
             &env_context,
             config.verbose,
+            secret_manager.as_ref(),
+            Some(&secret_masker),
         )
         .await?;
 
@@ -421,6 +466,7 @@ pub struct ExecutionConfig {
     pub runtime_type: RuntimeType,
     pub verbose: bool,
     pub preserve_containers_on_failure: bool,
+    pub secrets_config: Option<SecretConfig>,
 }
 
 pub struct ExecutionResult {
@@ -592,11 +638,21 @@ async fn execute_job_batch(
     runtime: &dyn ContainerRuntime,
     env_context: &HashMap<String, String>,
     verbose: bool,
+    secret_manager: Option<&SecretManager>,
+    secret_masker: Option<&SecretMasker>,
 ) -> Result<Vec<JobResult>, ExecutionError> {
     // Execute jobs in parallel
-    let futures = jobs
-        .iter()
-        .map(|job_name| execute_job_with_matrix(job_name, workflow, runtime, env_context, verbose));
+    let futures = jobs.iter().map(|job_name| {
+        execute_job_with_matrix(
+            job_name,
+            workflow,
+            runtime,
+            env_context,
+            verbose,
+            secret_manager,
+            secret_masker,
+        )
+    });
 
     let result_arrays = future::join_all(futures).await;
 
@@ -619,6 +675,8 @@ struct JobExecutionContext<'a> {
     runtime: &'a dyn ContainerRuntime,
     env_context: &'a HashMap<String, String>,
     verbose: bool,
+    secret_manager: Option<&'a SecretManager>,
+    secret_masker: Option<&'a SecretMasker>,
 }
 
 /// Execute a job, expanding matrix if present
@@ -628,6 +686,8 @@ async fn execute_job_with_matrix(
     runtime: &dyn ContainerRuntime,
     env_context: &HashMap<String, String>,
     verbose: bool,
+    secret_manager: Option<&SecretManager>,
+    secret_masker: Option<&SecretMasker>,
 ) -> Result<Vec<JobResult>, ExecutionError> {
     // Get the job definition
     let job = workflow.jobs.get(job_name).ok_or_else(|| {
@@ -690,6 +750,8 @@ async fn execute_job_with_matrix(
             runtime,
             env_context,
             verbose,
+            secret_manager,
+            secret_masker,
         })
         .await
     } else {
@@ -700,6 +762,8 @@ async fn execute_job_with_matrix(
             runtime,
             env_context,
             verbose,
+            secret_manager,
+            secret_masker,
         };
         let result = execute_job(ctx).await?;
         Ok(vec![result])
@@ -766,6 +830,8 @@ async fn execute_job(ctx: JobExecutionContext<'_>) -> Result<JobResult, Executio
             runner_image: &runner_image_value,
             verbose: ctx.verbose,
             matrix_combination: &None,
+            secret_manager: ctx.secret_manager,
+            secret_masker: ctx.secret_masker,
         })
         .await;
 
@@ -835,6 +901,10 @@ struct MatrixExecutionContext<'a> {
     runtime: &'a dyn ContainerRuntime,
     env_context: &'a HashMap<String, String>,
     verbose: bool,
+    #[allow(dead_code)] // Planned for future implementation
+    secret_manager: Option<&'a SecretManager>,
+    #[allow(dead_code)] // Planned for future implementation
+    secret_masker: Option<&'a SecretMasker>,
 }
 
 /// Execute a set of matrix combinations
@@ -966,6 +1036,8 @@ async fn execute_matrix_job(
                 runner_image: &runner_image_value,
                 verbose,
                 matrix_combination: &Some(combination.values.clone()),
+                secret_manager: None, // Matrix execution context doesn't have secrets yet
+                secret_masker: None,
             })
             .await
             {
@@ -1035,6 +1107,9 @@ struct StepExecutionContext<'a> {
     verbose: bool,
     #[allow(dead_code)]
     matrix_combination: &'a Option<HashMap<String, Value>>,
+    secret_manager: Option<&'a SecretManager>,
+    #[allow(dead_code)] // Planned for future implementation
+    secret_masker: Option<&'a SecretMasker>,
 }
 
 async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, ExecutionError> {
@@ -1051,9 +1126,24 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
     // Prepare step environment
     let mut step_env = ctx.job_env.clone();
 
-    // Add step-level environment variables
+    // Add step-level environment variables (with secret substitution)
     for (key, value) in &ctx.step.env {
-        step_env.insert(key.clone(), value.clone());
+        let resolved_value = if let Some(secret_manager) = ctx.secret_manager {
+            let mut substitution = SecretSubstitution::new(secret_manager);
+            match substitution.substitute(value).await {
+                Ok(resolved) => resolved,
+                Err(e) => {
+                    wrkflw_logging::error(&format!(
+                        "Failed to resolve secrets in environment variable {}: {}",
+                        key, e
+                    ));
+                    value.clone()
+                }
+            }
+        } else {
+            value.clone()
+        };
+        step_env.insert(key.clone(), resolved_value);
     }
 
     // Execute the step based on its type
@@ -1588,12 +1678,29 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
         let mut status = StepStatus::Success;
         let mut error_details = None;
 
+        // Perform secret substitution if secret manager is available
+        let resolved_run = if let Some(secret_manager) = ctx.secret_manager {
+            let mut substitution = SecretSubstitution::new(secret_manager);
+            match substitution.substitute(run).await {
+                Ok(resolved) => resolved,
+                Err(e) => {
+                    return Ok(StepResult {
+                        name: step_name,
+                        status: StepStatus::Failure,
+                        output: format!("Secret substitution failed: {}", e),
+                    });
+                }
+            }
+        } else {
+            run.clone()
+        };
+
         // Check if this is a cargo command
-        let is_cargo_cmd = run.trim().starts_with("cargo");
+        let is_cargo_cmd = resolved_run.trim().starts_with("cargo");
 
         // For complex shell commands, use bash to execute them properly
         // This handles quotes, pipes, redirections, and command substitutions correctly
-        let cmd_parts = vec!["bash", "-c", run];
+        let cmd_parts = vec!["bash", "-c", &resolved_run];
 
         // Convert environment variables to the required format
         let env_vars: Vec<(&str, &str)> = step_env
@@ -1967,8 +2074,16 @@ async fn execute_reusable_workflow_job(
     let mut all_results = Vec::new();
     let mut any_failed = false;
     for batch in plan {
-        let results =
-            execute_job_batch(&batch, &called, ctx.runtime, &child_env, ctx.verbose).await?;
+        let results = execute_job_batch(
+            &batch,
+            &called,
+            ctx.runtime,
+            &child_env,
+            ctx.verbose,
+            None,
+            None,
+        )
+        .await?;
         for r in &results {
             if r.status == JobStatus::Failure {
                 any_failed = true;
@@ -2164,6 +2279,8 @@ async fn execute_composite_action(
                     runner_image,
                     verbose,
                     matrix_combination: &None,
+                    secret_manager: None, // Composite actions don't have secrets yet
+                    secret_masker: None,
                 }))
                 .await?;
 

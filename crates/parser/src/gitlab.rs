@@ -260,7 +260,7 @@ test_job:
         fs::write(&file, content).unwrap();
 
         // Parse the pipeline
-        let pipeline = parse_pipeline(&file.path()).unwrap();
+        let pipeline = parse_pipeline(file.path()).unwrap();
 
         // Validate basic structure
         assert_eq!(pipeline.stages.as_ref().unwrap().len(), 2);

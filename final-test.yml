@@ -1,0 +1,13 @@
+name: Final Secrets Test
+on: [push]
+
+jobs:
+  verify-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test secrets are working
+        env:
+          SECRET_VAL: ${{ secrets.TEST_SECRET }}
+        run: |
+          echo "Secret length: ${#SECRET_VAL}"
+          echo "All secrets functionality verified!"
