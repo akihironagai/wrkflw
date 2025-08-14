@@ -114,17 +114,26 @@ async fn test_end_to_end_secret_workflow() {
     assert!(health_results.get("env").unwrap().is_ok());
     assert!(health_results.get("file").unwrap().is_ok());
 
-    // Test 7: Caching behavior
-    let start_time = std::time::Instant::now();
-    let _ = manager.get_secret(&env_secret_name).await.unwrap();
-    let first_duration = start_time.elapsed();
+    // Test 7: Caching behavior - functional test instead of timing
+    // First call should succeed and populate cache
+    let cached_secret = manager.get_secret(&env_secret_name).await.unwrap();
+    assert_eq!(
+        cached_secret.value(),
+        "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
+    );
 
-    let start_time = std::time::Instant::now();
-    let _ = manager.get_secret(&env_secret_name).await.unwrap();
-    let second_duration = start_time.elapsed();
+    // Remove the environment variable to test if cache works
+    std::env::remove_var(&env_secret_name);
 
-    // Second call should be faster due to caching
-    assert!(second_duration < first_duration);
+    // Second call should still succeed because value is cached
+    let cached_secret_2 = manager.get_secret(&env_secret_name).await.unwrap();
+    assert_eq!(
+        cached_secret_2.value(),
+        "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
+    );
+
+    // Restore environment variable for cleanup
+    std::env::set_var(&env_secret_name, "ghp_1234567890abcdefghijklmnopqrstuvwxyz");
 
     // Cleanup
     std::env::remove_var(&env_secret_name);
