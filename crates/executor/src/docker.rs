@@ -840,6 +840,14 @@ impl DockerRuntime {
         working_dir: &Path,
         volumes: &[(&Path, &Path)],
     ) -> Result<ContainerOutput, ContainerError> {
+        // First, try to pull the image if it's not available locally
+        if let Err(e) = self.pull_image_inner(image).await {
+            wrkflw_logging::warning(&format!(
+                "Failed to pull image {}: {}. Attempting to continue with existing image.",
+                image, e
+            ));
+        }
+
         // Collect environment variables
         let mut env: Vec<String> = env_vars
             .iter()

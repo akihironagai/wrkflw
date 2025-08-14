@@ -526,9 +526,64 @@ async fn prepare_action(
         }
     }
 
-    // GitHub action: use standard runner image
-    // In a real implementation, you'd need to clone the repo at the specified version
-    Ok("node:16-buster-slim".to_string())
+    // GitHub action: determine appropriate image based on action type
+    let image = determine_action_image(&action.repository);
+    Ok(image)
+}
+
+/// Determine the appropriate Docker image for a GitHub action
+fn determine_action_image(repository: &str) -> String {
+    // Handle specific well-known actions
+    match repository {
+        // PHP setup actions
+        repo if repo.starts_with("shivammathur/setup-php") => {
+            "composer:latest".to_string() // Use composer image which includes PHP and composer
+        }
+
+        // Python setup actions
+        repo if repo.starts_with("actions/setup-python") => "python:3.11-slim".to_string(),
+
+        // Node.js setup actions
+        repo if repo.starts_with("actions/setup-node") => "node:20-slim".to_string(),
+
+        // Java setup actions
+        repo if repo.starts_with("actions/setup-java") => "eclipse-temurin:17-jdk".to_string(),
+
+        // Go setup actions
+        repo if repo.starts_with("actions/setup-go") => "golang:1.21-slim".to_string(),
+
+        // .NET setup actions
+        repo if repo.starts_with("actions/setup-dotnet") => {
+            "mcr.microsoft.com/dotnet/sdk:7.0".to_string()
+        }
+
+        // Rust setup actions
+        repo if repo.starts_with("actions-rs/toolchain")
+            || repo.starts_with("dtolnay/rust-toolchain") =>
+        {
+            "rust:latest".to_string()
+        }
+
+        // Docker/container actions
+        repo if repo.starts_with("docker/") => "docker:latest".to_string(),
+
+        // AWS actions
+        repo if repo.starts_with("aws-actions/") => "amazon/aws-cli:latest".to_string(),
+
+        // Default to Node.js for most GitHub actions (checkout, upload-artifact, etc.)
+        _ => {
+            // Check if it's a common core GitHub action that should use a more complete environment
+            if repository.starts_with("actions/checkout")
+                || repository.starts_with("actions/upload-artifact")
+                || repository.starts_with("actions/download-artifact")
+                || repository.starts_with("actions/cache")
+            {
+                "catthehacker/ubuntu:act-latest".to_string() // Use act runner image for core actions
+            } else {
+                "node:16-buster-slim".to_string() // Default for other actions
+            }
+        }
+    }
 }
 
 async fn execute_job_batch(
@@ -1536,8 +1591,9 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
         // Check if this is a cargo command
         let is_cargo_cmd = run.trim().starts_with("cargo");
 
-        // Convert command string to array of string slices
-        let cmd_parts: Vec<&str> = run.split_whitespace().collect();
+        // For complex shell commands, use bash to execute them properly
+        // This handles quotes, pipes, redirections, and command substitutions correctly
+        let cmd_parts = vec!["bash", "-c", run];
 
         // Convert environment variables to the required format
         let env_vars: Vec<(&str, &str)> = step_env
