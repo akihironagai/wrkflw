@@ -123,7 +123,7 @@
 //!
 //! ```rust
 //! use wrkflw_secrets::{SecretProviderConfig, SecretManager, SecretConfig};
-//! 
+//!
 //! // With prefix for better security
 //! let provider = SecretProviderConfig::Environment {
 //!     prefix: Some("MYAPP_".to_string())
@@ -190,7 +190,10 @@ mod tests {
             .expect("Failed to create manager");
 
         // Use a unique test secret name to avoid conflicts
-        let test_secret_name = format!("TEST_SECRET_{}", uuid::Uuid::new_v4().to_string().replace('-', "_"));
+        let test_secret_name = format!(
+            "TEST_SECRET_{}",
+            uuid::Uuid::new_v4().to_string().replace('-', "_")
+        );
         std::env::set_var(&test_secret_name, "secret_value");
 
         let result = manager.get_secret(&test_secret_name).await;
@@ -210,7 +213,10 @@ mod tests {
             .expect("Failed to create manager");
 
         // Use a unique test secret name to avoid conflicts
-        let test_secret_name = format!("GITHUB_TOKEN_{}", uuid::Uuid::new_v4().to_string().replace('-', "_"));
+        let test_secret_name = format!(
+            "GITHUB_TOKEN_{}",
+            uuid::Uuid::new_v4().to_string().replace('-', "_")
+        );
         std::env::set_var(&test_secret_name, "ghp_test_token");
 
         let mut substitution = SecretSubstitution::new(&manager);

@@ -14,9 +14,7 @@ fn bench_basic_masking(c: &mut Criterion) {
 
     let text = "The password is password123 and the API key is api_key_abcdef123456. Also super_secret_value_that_should_be_masked is here.";
 
-    c.bench_function("basic_masking", |b| {
-        b.iter(|| masker.mask(black_box(text)))
-    });
+    c.bench_function("basic_masking", |b| b.iter(|| masker.mask(black_box(text))));
 }
 
 fn bench_pattern_masking(c: &mut Criterion) {
@@ -50,7 +48,7 @@ fn bench_large_text_masking(c: &mut Criterion) {
 
 fn bench_many_secrets(c: &mut Criterion) {
     let mut masker = SecretMasker::new();
-    
+
     // Add many secrets
     for i in 0..100 {
         masker.add_secret(format!("secret_{}", i));
@@ -58,9 +56,7 @@ fn bench_many_secrets(c: &mut Criterion) {
 
     let text = "This text contains secret_50 and secret_75 but not others.";
 
-    c.bench_function("many_secrets", |b| {
-        b.iter(|| masker.mask(black_box(text)))
-    });
+    c.bench_function("many_secrets", |b| b.iter(|| masker.mask(black_box(text))));
 }
 
 fn bench_contains_secrets(c: &mut Criterion) {

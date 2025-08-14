@@ -1,4 +1,6 @@
-use crate::{validation::validate_secret_value, SecretError, SecretProvider, SecretResult, SecretValue};
+use crate::{
+    validation::validate_secret_value, SecretError, SecretProvider, SecretResult, SecretValue,
+};
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -154,7 +156,7 @@ impl SecretProvider for FileProvider {
         if let Some(value) = secrets.get(name) {
             // Validate the secret value
             validate_secret_value(value)?;
-            
+
             let mut metadata = HashMap::new();
             metadata.insert("source".to_string(), "file".to_string());
             metadata.insert("file_path".to_string(), self.expand_path());

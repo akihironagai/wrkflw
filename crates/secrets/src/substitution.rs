@@ -169,14 +169,17 @@ mod tests {
         // Use unique secret names to avoid test conflicts
         let github_token_name = format!("GITHUB_TOKEN_{}", std::process::id());
         let api_key_name = format!("API_KEY_{}", std::process::id());
-        
+
         std::env::set_var(&github_token_name, "ghp_test_token");
         std::env::set_var(&api_key_name, "secret_api_key");
 
         let manager = SecretManager::default().await.unwrap();
         let mut substitution = SecretSubstitution::new(&manager);
 
-        let input = format!("Token: ${{{{ secrets.{} }}}}, API: ${{{{ secrets.{} }}}}", github_token_name, api_key_name);
+        let input = format!(
+            "Token: ${{{{ secrets.{} }}}}, API: ${{{{ secrets.{} }}}}",
+            github_token_name, api_key_name
+        );
         let result = substitution.substitute(&input).await.unwrap();
 
         assert_eq!(result, "Token: ghp_test_token, API: secret_api_key");

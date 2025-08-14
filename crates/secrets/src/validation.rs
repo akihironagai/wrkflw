@@ -37,7 +37,8 @@ pub fn validate_secret_name(name: &str) -> SecretResult<()> {
 
     if !SECRET_NAME_PATTERN.is_match(name) {
         return Err(SecretError::InvalidSecretName {
-            reason: "Secret name can only contain letters, numbers, underscores, hyphens, and dots".to_string(),
+            reason: "Secret name can only contain letters, numbers, underscores, hyphens, and dots"
+                .to_string(),
         });
     }
 
@@ -56,8 +57,8 @@ pub fn validate_secret_name(name: &str) -> SecretResult<()> {
 
     // Reserved names
     let reserved_names = [
-        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     ];
 
     if reserved_names.contains(&name.to_uppercase().as_str()) {
@@ -72,7 +73,7 @@ pub fn validate_secret_name(name: &str) -> SecretResult<()> {
 /// Validate a secret value
 pub fn validate_secret_value(value: &str) -> SecretResult<()> {
     let size = value.len();
-    
+
     if size > MAX_SECRET_SIZE {
         return Err(SecretError::SecretTooLarge {
             size,
@@ -99,12 +100,16 @@ pub fn validate_provider_name(name: &str) -> SecretResult<()> {
     }
 
     if name.len() > 64 {
-        return Err(SecretError::InvalidConfig(
-            format!("Provider name too long: {} characters (max: 64)", name.len()),
-        ));
+        return Err(SecretError::InvalidConfig(format!(
+            "Provider name too long: {} characters (max: 64)",
+            name.len()
+        )));
     }
 
-    if !name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+    if !name
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
         return Err(SecretError::InvalidConfig(
             "Provider name can only contain letters, numbers, underscores, and hyphens".to_string(),
         ));
@@ -134,19 +139,19 @@ pub fn looks_like_secret(value: &str) -> bool {
     // Check for high entropy (random-looking strings)
     let unique_chars: std::collections::HashSet<char> = value.chars().collect();
     let entropy_ratio = unique_chars.len() as f64 / value.len() as f64;
-    
+
     if entropy_ratio > 0.6 && value.len() > 16 {
         return true;
     }
 
     // Check for common secret patterns
     let secret_patterns = [
-        r"^[A-Za-z0-9+/=]{40,}$",           // Base64-like
-        r"^[a-fA-F0-9]{32,}$",              // Hex strings
-        r"^[A-Z0-9]{20,}$",                 // All caps alphanumeric
-        r"^sk_[a-zA-Z0-9_-]+$",             // Stripe-like keys
-        r"^pk_[a-zA-Z0-9_-]+$",             // Public keys
-        r"^rk_[a-zA-Z0-9_-]+$",             // Restricted keys
+        r"^[A-Za-z0-9+/=]{40,}$", // Base64-like
+        r"^[a-fA-F0-9]{32,}$",    // Hex strings
+        r"^[A-Z0-9]{20,}$",       // All caps alphanumeric
+        r"^sk_[a-zA-Z0-9_-]+$",   // Stripe-like keys
+        r"^pk_[a-zA-Z0-9_-]+$",   // Public keys
+        r"^rk_[a-zA-Z0-9_-]+$",   // Restricted keys
     ];
 
     for pattern in &secret_patterns {
@@ -224,7 +229,9 @@ mod tests {
         assert!(looks_like_secret("sk_test_abcdefghijklmnop1234567890"));
         assert!(looks_like_secret("abcdefghijklmnopqrstuvwxyz123456"));
         assert!(looks_like_secret("ABCDEF1234567890ABCDEF1234567890"));
-        assert!(looks_like_secret("YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkw"));
+        assert!(looks_like_secret(
+            "YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY3ODkw"
+        ));
 
         // Should not detect as secrets
         assert!(!looks_like_secret("short"));

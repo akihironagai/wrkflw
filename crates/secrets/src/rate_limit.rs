@@ -56,7 +56,7 @@ impl RequestTracker {
     fn cleanup_old_requests(&mut self, window_duration: Duration, now: Instant) {
         let cutoff = now - window_duration;
         self.requests.retain(|&req_time| req_time > cutoff);
-        
+
         if let Some(&first) = self.requests.first() {
             self.first_request = first;
         }
@@ -82,8 +82,6 @@ impl RateLimiter {
         }
     }
 
-
-
     /// Check if a request should be allowed for the given key
     pub async fn check_rate_limit(&self, key: &str) -> SecretResult<()> {
         if !self.config.enabled {
@@ -92,11 +90,11 @@ impl RateLimiter {
 
         let now = Instant::now();
         let mut trackers = self.trackers.write().await;
-        
+
         // Clean up old requests for existing tracker
         if let Some(tracker) = trackers.get_mut(key) {
             tracker.cleanup_old_requests(self.config.window_duration, now);
-            
+
             // Check if we're over the limit
             if tracker.request_count() >= self.config.max_requests as usize {
                 let time_until_reset = self.config.window_duration - (now - tracker.first_request);
@@ -105,7 +103,7 @@ impl RateLimiter {
                     time_until_reset.as_secs()
                 )));
             }
-            
+
             // Add the current request
             tracker.add_request(now);
         } else {
@@ -114,7 +112,7 @@ impl RateLimiter {
             tracker.add_request(now);
             trackers.insert(key.to_string(), tracker);
         }
-        
+
         Ok(())
     }
 

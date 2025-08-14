@@ -1,4 +1,6 @@
-use crate::{validation::validate_secret_value, SecretError, SecretProvider, SecretResult, SecretValue};
+use crate::{
+    validation::validate_secret_value, SecretError, SecretProvider, SecretResult, SecretValue,
+};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -21,7 +23,6 @@ impl Default for EnvironmentProvider {
 }
 
 impl EnvironmentProvider {
-
     /// Get the full environment variable name
     fn get_env_name(&self, name: &str) -> String {
         match &self.prefix {
@@ -40,7 +41,7 @@ impl SecretProvider for EnvironmentProvider {
             Ok(value) => {
                 // Validate the secret value
                 validate_secret_value(&value)?;
-                
+
                 let mut metadata = HashMap::new();
                 metadata.insert("source".to_string(), "environment".to_string());
                 metadata.insert("env_var".to_string(), env_name);

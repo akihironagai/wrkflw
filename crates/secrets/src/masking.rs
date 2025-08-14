@@ -137,16 +137,28 @@ impl SecretMasker {
         let mut result = text.to_string();
 
         // GitHub Personal Access Tokens
-        result = patterns.github_pat.replace_all(&result, "ghp_***").to_string();
+        result = patterns
+            .github_pat
+            .replace_all(&result, "ghp_***")
+            .to_string();
 
         // GitHub App tokens
-        result = patterns.github_app.replace_all(&result, "ghs_***").to_string();
+        result = patterns
+            .github_app
+            .replace_all(&result, "ghs_***")
+            .to_string();
 
         // GitHub OAuth tokens
-        result = patterns.github_oauth.replace_all(&result, "gho_***").to_string();
+        result = patterns
+            .github_oauth
+            .replace_all(&result, "gho_***")
+            .to_string();
 
         // AWS Access Key IDs
-        result = patterns.aws_access_key.replace_all(&result, "AKIA***").to_string();
+        result = patterns
+            .aws_access_key
+            .replace_all(&result, "AKIA***")
+            .to_string();
 
         // AWS Secret Access Keys (basic pattern)
         // Only mask if it's clearly in a secret context (basic heuristic)
@@ -155,10 +167,16 @@ impl SecretMasker {
         }
 
         // JWT tokens (basic pattern)
-        result = patterns.jwt.replace_all(&result, "eyJ***.eyJ***.***").to_string();
+        result = patterns
+            .jwt
+            .replace_all(&result, "eyJ***.eyJ***.***")
+            .to_string();
 
         // API keys with common prefixes
-        result = patterns.api_key.replace_all(&result, "${1}=***").to_string();
+        result = patterns
+            .api_key
+            .replace_all(&result, "${1}=***")
+            .to_string();
 
         result
     }
@@ -178,12 +196,12 @@ impl SecretMasker {
     /// Check if text contains common secret patterns
     fn has_secret_patterns(&self, text: &str) -> bool {
         let patterns = PATTERNS.get_or_init(CompiledPatterns::new);
-        
-        patterns.github_pat.is_match(text) ||
-        patterns.github_app.is_match(text) ||
-        patterns.github_oauth.is_match(text) ||
-        patterns.aws_access_key.is_match(text) ||
-        patterns.jwt.is_match(text)
+
+        patterns.github_pat.is_match(text)
+            || patterns.github_app.is_match(text)
+            || patterns.github_oauth.is_match(text)
+            || patterns.aws_access_key.is_match(text)
+            || patterns.jwt.is_match(text)
     }
 
     /// Get the number of secrets being tracked

@@ -60,8 +60,14 @@ async fn test_end_to_end_secret_workflow() {
 
     // Test 1: Get secret from environment provider
     let env_secret = manager.get_secret(&env_secret_name).await.unwrap();
-    assert_eq!(env_secret.value(), "ghp_1234567890abcdefghijklmnopqrstuvwxyz");
-    assert_eq!(env_secret.metadata.get("source"), Some(&"environment".to_string()));
+    assert_eq!(
+        env_secret.value(),
+        "ghp_1234567890abcdefghijklmnopqrstuvwxyz"
+    );
+    assert_eq!(
+        env_secret.metadata.get("source"),
+        Some(&"environment".to_string())
+    );
 
     // Test 2: Get secret from file provider
     let file_secret = manager
@@ -69,7 +75,10 @@ async fn test_end_to_end_secret_workflow() {
         .await
         .unwrap();
     assert_eq!(file_secret.value(), "super_secret_db_pass_123");
-    assert_eq!(file_secret.metadata.get("source"), Some(&"file".to_string()));
+    assert_eq!(
+        file_secret.metadata.get("source"),
+        Some(&"file".to_string())
+    );
 
     // Test 3: List secrets from file provider
     let all_secrets = manager.list_all_secrets().await.unwrap();
@@ -152,8 +161,8 @@ async fn test_error_handling() {
 /// Test rate limiting functionality
 #[tokio::test]
 async fn test_rate_limiting() {
-    use wrkflw_secrets::rate_limit::RateLimitConfig;
     use std::time::Duration;
+    use wrkflw_secrets::rate_limit::RateLimitConfig;
 
     // Create config with very low rate limit
     let mut config = SecretConfig::default();
@@ -179,7 +188,10 @@ async fn test_rate_limiting() {
     // Third request should fail due to rate limiting
     let result3 = manager.get_secret(&test_secret_name).await;
     assert!(result3.is_err());
-    assert!(result3.unwrap_err().to_string().contains("Rate limit exceeded"));
+    assert!(result3
+        .unwrap_err()
+        .to_string()
+        .contains("Rate limit exceeded"));
 
     // Cleanup
     std::env::remove_var(&test_secret_name);
@@ -308,7 +320,10 @@ async fn test_comprehensive_masking() {
         for pattern in should_not_contain {
             if pattern != "***" {
                 assert!(
-                    !masked.contains(pattern) || pattern == "ghp_" || pattern == "AKIA" || pattern == "eyJ",
+                    !masked.contains(pattern)
+                        || pattern == "ghp_"
+                        || pattern == "AKIA"
+                        || pattern == "eyJ",
                     "Masked text '{}' should not contain '{}' (or only partial patterns)",
                     masked,
                     pattern

@@ -33,7 +33,7 @@ impl SecretManager {
         for (name, provider_config) in &config.providers {
             // Validate provider name
             validate_provider_name(name)?;
-            
+
             let provider: Box<dyn SecretProvider> = match provider_config {
                 SecretProviderConfig::Environment { prefix } => {
                     Box::new(EnvironmentProvider::new(prefix.clone()))
@@ -54,7 +54,7 @@ impl SecretManager {
         }
 
         let rate_limiter = RateLimiter::new(config.rate_limit.clone());
-        
+
         Ok(Self {
             config,
             providers,
