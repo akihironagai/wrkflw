@@ -643,6 +643,15 @@ pub async fn handle_special_action(action: &str) -> Result<(), ContainerError> {
         wrkflw_logging::info(&format!("🔄 Detected Rust formatter action: {}", action));
 
         check_command_available("rustfmt", "rustfmt", "rustup component add rustfmt");
+    } else if action.starts_with("dtolnay/rust-toolchain@") {
+        // For dtolnay/rust-toolchain action, check for Rust installation
+        wrkflw_logging::info(&format!(
+            "🔄 Detected dtolnay Rust toolchain action: {}",
+            action
+        ));
+
+        check_command_available("rustc", "Rust", "https://rustup.rs/");
+        check_command_available("cargo", "Cargo", "https://rustup.rs/");
     } else if action.starts_with("actions/setup-node@") {
         // Node.js setup action
         wrkflw_logging::info(&format!("🔄 Detected Node.js setup action: {}", action));
