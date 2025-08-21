@@ -804,13 +804,6 @@ async fn execute_job(ctx: JobExecutionContext<'_>) -> Result<JobResult, Executio
         ExecutionError::Execution(format!("Failed to get current directory: {}", e))
     })?;
 
-    // Copy project files to the job workspace directory
-    wrkflw_logging::info(&format!(
-        "Copying project files to job workspace: {}",
-        job_dir.path().display()
-    ));
-    copy_directory_contents(&current_dir, job_dir.path())?;
-
     wrkflw_logging::info(&format!("Executing job: {}", ctx.job_name));
 
     let mut job_success = true;
@@ -1009,13 +1002,6 @@ async fn execute_matrix_job(
     let current_dir = std::env::current_dir().map_err(|e| {
         ExecutionError::Execution(format!("Failed to get current directory: {}", e))
     })?;
-
-    // Copy project files to the job workspace directory
-    wrkflw_logging::info(&format!(
-        "Copying project files to job workspace: {}",
-        job_dir.path().display()
-    ));
-    copy_directory_contents(&current_dir, job_dir.path())?;
 
     let job_success = if job_template.steps.is_empty() {
         wrkflw_logging::warning(&format!("Job '{}' has no steps", matrix_job_name));
@@ -1806,6 +1792,7 @@ fn copy_directory_contents(from: &Path, to: &Path) -> Result<(), ExecutionError>
         let entry =
             entry.map_err(|e| ExecutionError::Execution(format!("Failed to read entry: {}", e)))?;
         let path = entry.path();
+        wrkflw_logging::debug(&format!("Copying entry: {path:?} -> {to:?}"));
 
         // Skip hidden files/dirs and target directory for efficiency
         let file_name = match path.file_name() {
