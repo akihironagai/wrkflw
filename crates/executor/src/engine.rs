@@ -9,6 +9,8 @@ use std::path::Path;
 use std::process::Command;
 use thiserror::Error;
 
+use ignore::{gitignore::GitignoreBuilder, Match};
+
 use crate::dependency;
 use crate::docker;
 use crate::environment;
@@ -1785,16 +1787,77 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
     Ok(step_result)
 }
 
+/// Create a gitignore matcher for the given directory
+fn create_gitignore_matcher(
+    dir: &Path,
+) -> Result<Option<ignore::gitignore::Gitignore>, ExecutionError> {
+    let mut builder = GitignoreBuilder::new(dir);
+
+    // Try to add .gitignore file if it exists
+    let gitignore_path = dir.join(".gitignore");
+    if gitignore_path.exists() {
+        builder.add(&gitignore_path);
+    }
+
+    // Add some common ignore patterns as fallback
+    builder.add_line(None, "target/").map_err(|e| {
+        ExecutionError::Execution(format!("Failed to add default ignore pattern: {}", e))
+    })?;
+    builder.add_line(None, ".git/").map_err(|e| {
+        ExecutionError::Execution(format!("Failed to add default ignore pattern: {}", e))
+    })?;
+
+    match builder.build() {
+        Ok(gitignore) => Ok(Some(gitignore)),
+        Err(e) => {
+            wrkflw_logging::warning(&format!("Failed to build gitignore matcher: {}", e));
+            Ok(None)
+        }
+    }
+}
+
 fn copy_directory_contents(from: &Path, to: &Path) -> Result<(), ExecutionError> {
+    copy_directory_contents_with_gitignore(from, to, None)
+}
+
+fn copy_directory_contents_with_gitignore(
+    from: &Path,
+    to: &Path,
+    gitignore: Option<&ignore::gitignore::Gitignore>,
+) -> Result<(), ExecutionError> {
+    // If no gitignore provided, try to create one for the root directory
+    let root_gitignore;
+    let gitignore = if gitignore.is_none() {
+        root_gitignore = create_gitignore_matcher(from)?;
+        root_gitignore.as_ref()
+    } else {
+        gitignore
+    };
+
     for entry in std::fs::read_dir(from)
         .map_err(|e| ExecutionError::Execution(format!("Failed to read directory: {}", e)))?
     {
         let entry =
             entry.map_err(|e| ExecutionError::Execution(format!("Failed to read entry: {}", e)))?;
         let path = entry.path();
+
+        // Check if the file should be ignored according to .gitignore
+        if let Some(gitignore) = gitignore {
+            let relative_path = path.strip_prefix(from).unwrap_or(&path);
+            match gitignore.matched(relative_path, path.is_dir()) {
+                Match::Ignore(_) => {
+                    wrkflw_logging::debug(&format!("Skipping ignored file/directory: {path:?}"));
+                    continue;
+                }
+                Match::Whitelist(_) | Match::None => {
+                    // File is not ignored or explicitly whitelisted
+                }
+            }
+        }
+
         wrkflw_logging::debug(&format!("Copying entry: {path:?} -> {to:?}"));
 
-        // Skip hidden files/dirs and target directory for efficiency
+        // Additional basic filtering for hidden files (but allow .gitignore and .github)
         let file_name = match path.file_name() {
             Some(name) => name.to_string_lossy(),
             None => {
@@ -1804,7 +1867,13 @@ fn copy_directory_contents(from: &Path, to: &Path) -> Result<(), ExecutionError>
                 )));
             }
         };
-        if file_name.starts_with(".") || file_name == "target" {
+
+        // Skip most hidden files but allow important ones
+        if file_name.starts_with(".")
+            && file_name != ".gitignore"
+            && file_name != ".github"
+            && !file_name.starts_with(".env")
+        {
             continue;
         }
 
@@ -1822,8 +1891,8 @@ fn copy_directory_contents(from: &Path, to: &Path) -> Result<(), ExecutionError>
             std::fs::create_dir_all(&dest_path)
                 .map_err(|e| ExecutionError::Execution(format!("Failed to create dir: {}", e)))?;
 
-            // Recursively copy subdirectories
-            copy_directory_contents(&path, &dest_path)?;
+            // Recursively copy subdirectories with the same gitignore
+            copy_directory_contents_with_gitignore(&path, &dest_path, gitignore)?;
         } else {
             std::fs::copy(&path, &dest_path)
                 .map_err(|e| ExecutionError::Execution(format!("Failed to copy file: {}", e)))?;
