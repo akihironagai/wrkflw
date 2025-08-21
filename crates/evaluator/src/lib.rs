@@ -21,26 +21,9 @@ pub fn evaluate_workflow_file(path: &Path, verbose: bool) -> Result<ValidationRe
         return Ok(result);
     }
 
-    // Check if name exists
-    if workflow.get("name").is_none() {
-        // Check if this might be a reusable workflow caller before reporting missing name
-        let has_reusable_workflow_job = if let Some(Value::Mapping(jobs)) = workflow.get("jobs") {
-            jobs.values().any(|job| {
-                if let Some(job_config) = job.as_mapping() {
-                    job_config.contains_key(Value::String("uses".to_string()))
-                } else {
-                    false
-                }
-            })
-        } else {
-            false
-        };
-
-        // Only report missing name if it's not a workflow with reusable workflow jobs
-        if !has_reusable_workflow_job {
-            result.add_issue("Workflow is missing a name".to_string());
-        }
-    }
+    // Note: The 'name' field is optional per GitHub Actions specification.
+    // When omitted, GitHub displays the workflow file path relative to the repository root.
+    // We do not validate name presence as it's not required by the schema.
 
     // Check if jobs section exists
     match workflow.get("jobs") {
