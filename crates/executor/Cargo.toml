@@ -27,6 +27,7 @@ chrono.workspace = true
 dirs.workspace = true
 futures.workspace = true
 futures-util.workspace = true
+ignore = "0.4"
 lazy_static.workspace = true
 num_cpus.workspace = true
 once_cell.workspace = true

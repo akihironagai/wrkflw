@@ -10,6 +10,8 @@ use tempfile::TempDir;
 use which;
 use wrkflw_logging;
 
+use ignore::{gitignore::GitignoreBuilder, Match};
+
 // Global collection of resources to clean up
 static EMULATION_WORKSPACES: Lazy<Mutex<Vec<PathBuf>>> = Lazy::new(|| Mutex::new(Vec::new()));
 static EMULATION_PROCESSES: Lazy<Mutex<Vec<u32>>> = Lazy::new(|| Mutex::new(Vec::new()));
@@ -490,14 +492,75 @@ impl ContainerRuntime for EmulationRuntime {
 }
 
 #[allow(dead_code)]
+/// Create a gitignore matcher for the given directory
+fn create_gitignore_matcher(
+    dir: &Path,
+) -> Result<Option<ignore::gitignore::Gitignore>, std::io::Error> {
+    let mut builder = GitignoreBuilder::new(dir);
+
+    // Try to add .gitignore file if it exists
+    let gitignore_path = dir.join(".gitignore");
+    if gitignore_path.exists() {
+        builder.add(&gitignore_path);
+    }
+
+    // Add some common ignore patterns as fallback
+    if let Err(e) = builder.add_line(None, "target/") {
+        wrkflw_logging::warning(&format!("Failed to add default ignore pattern: {}", e));
+    }
+    if let Err(e) = builder.add_line(None, ".git/") {
+        wrkflw_logging::warning(&format!("Failed to add default ignore pattern: {}", e));
+    }
+
+    match builder.build() {
+        Ok(gitignore) => Ok(Some(gitignore)),
+        Err(e) => {
+            wrkflw_logging::warning(&format!("Failed to build gitignore matcher: {}", e));
+            Ok(None)
+        }
+    }
+}
+
 fn copy_directory_contents(source: &Path, dest: &Path) -> std::io::Result<()> {
+    copy_directory_contents_with_gitignore(source, dest, None)
+}
+
+fn copy_directory_contents_with_gitignore(
+    source: &Path,
+    dest: &Path,
+    gitignore: Option<&ignore::gitignore::Gitignore>,
+) -> std::io::Result<()> {
     // Create the destination directory if it doesn't exist
     fs::create_dir_all(dest)?;
+
+    // If no gitignore provided, try to create one for the root directory
+    let root_gitignore;
+    let gitignore = if gitignore.is_none() {
+        root_gitignore = create_gitignore_matcher(source)?;
+        root_gitignore.as_ref()
+    } else {
+        gitignore
+    };
 
     // Iterate through all entries in the source directory
     for entry in fs::read_dir(source)? {
         let entry = entry?;
         let path = entry.path();
+
+        // Check if the file should be ignored according to .gitignore
+        if let Some(gitignore) = gitignore {
+            let relative_path = path.strip_prefix(source).unwrap_or(&path);
+            match gitignore.matched(relative_path, path.is_dir()) {
+                Match::Ignore(_) => {
+                    wrkflw_logging::debug(&format!("Skipping ignored file/directory: {path:?}"));
+                    continue;
+                }
+                Match::Whitelist(_) | Match::None => {
+                    // File is not ignored or explicitly whitelisted
+                }
+            }
+        }
+
         let file_name = match path.file_name() {
             Some(name) => name,
             None => {
@@ -507,23 +570,19 @@ fn copy_directory_contents(source: &Path, dest: &Path) -> std::io::Result<()> {
         };
         let dest_path = dest.join(file_name);
 
-        // Skip hidden files (except .gitignore and .github might be useful)
+        // Skip most hidden files but allow important ones
         let file_name_str = file_name.to_string_lossy();
         if file_name_str.starts_with(".")
             && file_name_str != ".gitignore"
             && file_name_str != ".github"
+            && !file_name_str.starts_with(".env")
         {
             continue;
         }
 
-        // Skip target directory for Rust projects
-        if file_name_str == "target" {
-            continue;
-        }
-
         if path.is_dir() {
-            // Recursively copy subdirectories
-            copy_directory_contents(&path, &dest_path)?;
+            // Recursively copy subdirectories with the same gitignore
+            copy_directory_contents_with_gitignore(&path, &dest_path, gitignore)?;
         } else {
             // Copy files
             fs::copy(&path, &dest_path)?;
