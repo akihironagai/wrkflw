@@ -570,7 +570,7 @@ async fn prepare_action(
         } else {
             // It's a JavaScript or composite action
             // For simplicity, we'll use node to run it (this would need more work for full support)
-            return Ok("node:16-buster-slim".to_string());
+            return Ok("node:20-slim".to_string());
         }
     }
 
@@ -628,7 +628,7 @@ fn determine_action_image(repository: &str) -> String {
             {
                 "catthehacker/ubuntu:act-latest".to_string() // Use act runner image for core actions
             } else {
-                "node:16-buster-slim".to_string() // Default for other actions
+                "node:20-slim".to_string() // Default for other actions
             }
         }
     }
@@ -1224,13 +1224,15 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                 let mut owned_strings: Vec<String> = Vec::new(); // Keep strings alive until after we use cmd
 
                 // Special handling for Rust actions
-                if uses.starts_with("actions-rs/") {
+                if uses.starts_with("actions-rs/") || uses.starts_with("dtolnay/rust-toolchain") {
                     wrkflw_logging::info(
                         "🔄 Detected Rust action - using system Rust installation",
                     );
 
                     // For toolchain action, verify Rust is installed
-                    if uses.starts_with("actions-rs/toolchain@") {
+                    if uses.starts_with("actions-rs/toolchain@")
+                        || uses.starts_with("dtolnay/rust-toolchain@")
+                    {
                         let rustc_version = Command::new("rustc")
                             .arg("--version")
                             .output()
@@ -1556,7 +1558,7 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                 let output = ctx
                     .runtime
                     .run_container(
-                        ctx.runner_image,
+                        &image,
                         &cmd.to_vec(),
                         &env_vars,
                         container_workspace,
@@ -1905,11 +1907,11 @@ fn copy_directory_contents_with_gitignore(
 fn get_runner_image(runs_on: &str) -> String {
     // Map GitHub runners to Docker images
     match runs_on.trim() {
-        // ubuntu runners - micro images (minimal size)
-        "ubuntu-latest" => "node:16-buster-slim",
-        "ubuntu-22.04" => "node:16-bullseye-slim",
-        "ubuntu-20.04" => "node:16-buster-slim",
-        "ubuntu-18.04" => "node:16-buster-slim",
+        // ubuntu runners - using Ubuntu base images for better compatibility
+        "ubuntu-latest" => "ubuntu:latest",
+        "ubuntu-22.04" => "ubuntu:22.04",
+        "ubuntu-20.04" => "ubuntu:20.04",
+        "ubuntu-18.04" => "ubuntu:18.04",
 
         // ubuntu runners - medium images (with more tools)
         "ubuntu-latest-medium" => "catthehacker/ubuntu:act-latest",
