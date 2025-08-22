@@ -44,7 +44,7 @@ rayon = "1.7.0"
 num_cpus = "1.16.0"
 regex = "1.10"
 lazy_static = "1.4"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }
 libc = "0.2"
 nix = { version = "0.27.1", features = ["fs"] }
 urlencoding = "2.1.3"
