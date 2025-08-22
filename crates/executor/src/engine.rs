@@ -1160,28 +1160,13 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                 detailed_output
                     .push_str(&format!("  - Destination: {}\n", ctx.working_dir.display()));
 
-                // Add list of top-level files/directories that were copied (limit to 10)
-                detailed_output.push_str("\nTop-level files/directories copied:\n");
+                // Add a summary count instead of listing all files
                 if let Ok(entries) = std::fs::read_dir(&current_dir) {
-                    for (i, entry) in entries.take(10).enumerate() {
-                        if let Ok(entry) = entry {
-                            let file_type = if entry.path().is_dir() {
-                                "directory"
-                            } else {
-                                "file"
-                            };
-                            detailed_output.push_str(&format!(
-                                "  - {} ({})\n",
-                                entry.file_name().to_string_lossy(),
-                                file_type
-                            ));
-                        }
-
-                        if i >= 9 {
-                            detailed_output.push_str("  - ... (more items not shown)\n");
-                            break;
-                        }
-                    }
+                    let entry_count = entries.count();
+                    detailed_output.push_str(&format!(
+                        "\nCopied {} top-level items to workspace\n",
+                        entry_count
+                    ));
                 }
 
                 detailed_output
@@ -1836,6 +1821,13 @@ fn copy_directory_contents_with_gitignore(
         gitignore
     };
 
+    // Log summary of the copy operation
+    wrkflw_logging::debug(&format!(
+        "Copying directory contents from {} to {}",
+        from.display(),
+        to.display()
+    ));
+
     for entry in std::fs::read_dir(from)
         .map_err(|e| ExecutionError::Execution(format!("Failed to read directory: {}", e)))?
     {
@@ -1857,7 +1849,7 @@ fn copy_directory_contents_with_gitignore(
             }
         }
 
-        wrkflw_logging::debug(&format!("Copying entry: {path:?} -> {to:?}"));
+        // Log individual files only in trace mode (removed verbose per-file logging)
 
         // Additional basic filtering for hidden files (but allow .gitignore and .github)
         let file_name = match path.file_name() {
