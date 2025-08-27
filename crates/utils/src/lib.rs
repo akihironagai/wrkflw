@@ -43,7 +43,7 @@ pub fn is_workflow_file(path: &Path) -> bool {
 /// differences in file descriptor handling. The functions will execute without
 /// error but stderr may not be fully suppressed.
 pub mod fd {
-    use std::io::{self, Result};
+    use std::io::Result;
 
     /// Represents a redirected stderr that can be restored
     pub struct RedirectedStderr {
@@ -61,6 +61,7 @@ pub mod fd {
         use nix::fcntl::{open, OFlag};
         use nix::sys::stat::Mode;
         use nix::unistd::{close, dup, dup2};
+        use std::io;
         use std::os::unix::io::RawFd;
         use std::path::Path;
 
@@ -119,8 +120,6 @@ pub mod fd {
     #[cfg(windows)]
     mod windows_impl {
         use super::*;
-        use std::fs::OpenOptions;
-        use std::io::Write;
 
         impl RedirectedStderr {
             /// Creates a new RedirectedStderr that redirects stderr to NUL on Windows
