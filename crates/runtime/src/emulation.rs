@@ -793,7 +793,7 @@ async fn cleanup_processes() {
             let _ = Command::new("taskkill")
                 .arg("/F")
                 .arg("/PID")
-                .arg(&pid.to_string())
+                .arg(pid.to_string())
                 .output();
         }
 
