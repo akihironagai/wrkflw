@@ -12,9 +12,9 @@ categories.workspace = true
 
 [dependencies]
 # Internal crates
-wrkflw-models = { path = "../models", version = "0.7.0" }
-wrkflw-validators = { path = "../validators", version = "0.7.0" }
+wrkflw-models.workspace = true
+wrkflw-validators.workspace = true
 
 # External dependencies
 colored.workspace = true
-serde_yaml.workspace = true 
+serde_yaml.workspace = true

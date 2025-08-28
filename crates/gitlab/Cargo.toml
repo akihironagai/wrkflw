@@ -12,7 +12,7 @@ categories.workspace = true
 
 [dependencies]
 # Internal crates
-wrkflw-models = { path = "../models", version = "0.7.0" }
+wrkflw-models.workspace = true
 
 # External dependencies
 lazy_static.workspace = true

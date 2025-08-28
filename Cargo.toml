@@ -1,7 +1,5 @@
 [workspace]
-members = [
-    "crates/*"
-]
+members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
@@ -16,6 +14,22 @@ categories = ["command-line-utilities"]
 license = "MIT"
 
 [workspace.dependencies]
+# Internal crate dependencies
+wrkflw-models = { path = "crates/models", version = "0.7.2" }
+wrkflw-evaluator = { path = "crates/evaluator", version = "0.7.2" }
+wrkflw-executor = { path = "crates/executor", version = "0.7.2" }
+wrkflw-github = { path = "crates/github", version = "0.7.2" }
+wrkflw-gitlab = { path = "crates/gitlab", version = "0.7.2" }
+wrkflw-logging = { path = "crates/logging", version = "0.7.2" }
+wrkflw-matrix = { path = "crates/matrix", version = "0.7.2" }
+wrkflw-parser = { path = "crates/parser", version = "0.7.2" }
+wrkflw-runtime = { path = "crates/runtime", version = "0.7.2" }
+wrkflw-secrets = { path = "crates/secrets", version = "0.7.2" }
+wrkflw-ui = { path = "crates/ui", version = "0.7.2" }
+wrkflw-utils = { path = "crates/utils", version = "0.7.2" }
+wrkflw-validators = { path = "crates/validators", version = "0.7.2" }
+
+# External dependencies
 clap = { version = "4.3", features = ["derive"] }
 colored = "2.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -44,7 +58,10 @@ rayon = "1.7.0"
 num_cpus = "1.16.0"
 regex = "1.10"
 lazy_static = "1.4"
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.11", default-features = false, features = [
+    "rustls-tls",
+    "json",
+] }
 libc = "0.2"
 nix = { version = "0.27.1", features = ["fs"] }
 urlencoding = "2.1.3"

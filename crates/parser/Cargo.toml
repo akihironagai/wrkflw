@@ -12,8 +12,8 @@ categories.workspace = true
 
 [dependencies]
 # Internal crates
-wrkflw-models = { path = "../models", version = "0.7.0" }
-wrkflw-matrix = { path = "../matrix", version = "0.7.0" }
+wrkflw-models.workspace = true
+wrkflw-matrix.workspace = true
 
 # External dependencies
 jsonschema.workspace = true

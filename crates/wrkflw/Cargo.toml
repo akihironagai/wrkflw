@@ -12,18 +12,18 @@ license.workspace = true
 
 [dependencies]
 # Workspace crates
-wrkflw-models = { path = "../models", version = "0.7.0" }
-wrkflw-executor = { path = "../executor", version = "0.7.0" }
-wrkflw-github = { path = "../github", version = "0.7.0" }
-wrkflw-gitlab = { path = "../gitlab", version = "0.7.0" }
-wrkflw-logging = { path = "../logging", version = "0.7.0" }
-wrkflw-matrix = { path = "../matrix", version = "0.7.0" }
-wrkflw-parser = { path = "../parser", version = "0.7.0" }
-wrkflw-runtime = { path = "../runtime", version = "0.7.0" }
-wrkflw-ui = { path = "../ui", version = "0.7.0" }
-wrkflw-utils = { path = "../utils", version = "0.7.0" }
-wrkflw-validators = { path = "../validators", version = "0.7.0" }
-wrkflw-evaluator = { path = "../evaluator", version = "0.7.0" }
+wrkflw-models.workspace = true
+wrkflw-executor.workspace = true
+wrkflw-github.workspace = true
+wrkflw-gitlab.workspace = true
+wrkflw-logging.workspace = true
+wrkflw-matrix.workspace = true
+wrkflw-parser.workspace = true
+wrkflw-runtime.workspace = true
+wrkflw-ui.workspace = true
+wrkflw-utils.workspace = true
+wrkflw-validators.workspace = true
+wrkflw-evaluator.workspace = true
 
 # External dependencies
 clap.workspace = true
@@ -62,4 +62,4 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "wrkflw"
-path = "src/main.rs" 
+path = "src/main.rs"

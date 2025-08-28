@@ -12,12 +12,12 @@ categories.workspace = true
 
 [dependencies]
 # Internal crates
-wrkflw-models = { path = "../models", version = "0.7.0" }
-wrkflw-evaluator = { path = "../evaluator", version = "0.7.0" }
-wrkflw-executor = { path = "../executor", version = "0.7.0" }
-wrkflw-logging = { path = "../logging", version = "0.7.0" }
-wrkflw-utils = { path = "../utils", version = "0.7.0" }
-wrkflw-github = { path = "../github", version = "0.7.0" }
+wrkflw-models.workspace = true
+wrkflw-evaluator.workspace = true
+wrkflw-executor.workspace = true
+wrkflw-logging.workspace = true
+wrkflw-utils.workspace = true
+wrkflw-github.workspace = true
 
 # External dependencies
 chrono.workspace = true
