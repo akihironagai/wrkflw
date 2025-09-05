@@ -1538,7 +1538,16 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
                 let container_workspace = Path::new("/github/workspace");
 
                 // Set up volume mapping from host working dir to container workspace
-                let volumes: Vec<(&Path, &Path)> = vec![(ctx.working_dir, container_workspace)];
+                let mut volumes: Vec<(&Path, &Path)> = vec![(ctx.working_dir, container_workspace)];
+
+                // Also mount the GitHub environment files directory if GITHUB_ENV is set
+                if let Some(github_env_path) = ctx.job_env.get("GITHUB_ENV") {
+                    if let Some(github_dir) = Path::new(github_env_path).parent() {
+                        if let Some(github_parent) = github_dir.parent() {
+                            volumes.push((github_parent, github_parent));
+                        }
+                    }
+                }
 
                 let output = ctx
                     .runtime
@@ -1687,7 +1696,16 @@ async fn execute_step(ctx: StepExecutionContext<'_>) -> Result<StepResult, Execu
         let container_workspace = Path::new("/github/workspace");
 
         // Set up volume mapping from host working dir to container workspace
-        let volumes: Vec<(&Path, &Path)> = vec![(ctx.working_dir, container_workspace)];
+        let mut volumes: Vec<(&Path, &Path)> = vec![(ctx.working_dir, container_workspace)];
+
+        // Also mount the GitHub environment files directory if GITHUB_ENV is set
+        if let Some(github_env_path) = ctx.job_env.get("GITHUB_ENV") {
+            if let Some(github_dir) = Path::new(github_env_path).parent() {
+                if let Some(github_parent) = github_dir.parent() {
+                    volumes.push((github_parent, github_parent));
+                }
+            }
+        }
 
         // Execute the command
         match ctx
