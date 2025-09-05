@@ -2089,6 +2089,10 @@ async fn execute_reusable_workflow_job(
                 ExecutionError::Execution(format!("Failed to create temp dir: {}", e))
             })?;
             let repo_url = format!("https://github.com/{}/{}.git", owner, repo);
+
+            // Clone into a subdirectory within tempdir to get clean structure
+            let repo_dir = tempdir.path().join("cloned_repo");
+
             // git clone
             let status = Command::new("git")
                 .arg("clone")
@@ -2097,7 +2101,7 @@ async fn execute_reusable_workflow_job(
                 .arg("--branch")
                 .arg(&r#ref)
                 .arg(&repo_url)
-                .arg(tempdir.path())
+                .arg(&repo_dir)
                 .status()
                 .map_err(|e| ExecutionError::Execution(format!("Failed to execute git: {}", e)))?;
             if !status.success() {
@@ -2106,18 +2110,93 @@ async fn execute_reusable_workflow_job(
                     repo_url, r#ref
                 )));
             }
-            let joined = tempdir.path().join(path);
+            let joined = repo_dir.join(path);
+
             if !joined.exists() {
                 return Err(ExecutionError::Execution(format!(
                     "Reusable workflow file not found in repo: {}",
                     joined.display()
                 )));
             }
-            joined
+
+            // Parse called workflow while keeping tempdir alive
+            let called = parse_workflow(&joined)?;
+
+            // Create child env context
+            let mut child_env = ctx.env_context.clone();
+            if let Some(with_map) = with {
+                for (k, v) in with_map {
+                    child_env.insert(format!("INPUT_{}", k.to_uppercase()), v.clone());
+                }
+            }
+            if let Some(secrets_val) = secrets {
+                if let Some(map) = secrets_val.as_mapping() {
+                    for (k, v) in map {
+                        if let (Some(key), Some(value)) = (k.as_str(), v.as_str()) {
+                            child_env.insert(
+                                format!("SECRET_{}", key.to_uppercase()),
+                                value.to_string(),
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Execute called workflow
+            let plan = dependency::resolve_dependencies(&called)?;
+            let mut all_results = Vec::new();
+            let mut any_failed = false;
+            for batch in plan {
+                let results = execute_job_batch(
+                    &batch,
+                    &called,
+                    ctx.runtime,
+                    &child_env,
+                    ctx.verbose,
+                    None,
+                    None,
+                )
+                .await?;
+                for r in &results {
+                    if r.status == JobStatus::Failure {
+                        any_failed = true;
+                    }
+                }
+                all_results.extend(results);
+            }
+
+            // Summarize into a single JobResult
+            let mut logs = String::new();
+            logs.push_str(&format!("Called workflow: {}\n", joined.display()));
+            for r in &all_results {
+                logs.push_str(&format!("- {}: {:?}\n", r.name, r.status));
+            }
+
+            // Represent as one summary step for UI
+            let summary_step = StepResult {
+                name: format!("Run reusable workflow: {}", uses),
+                status: if any_failed {
+                    StepStatus::Failure
+                } else {
+                    StepStatus::Success
+                },
+                output: logs.clone(),
+            };
+
+            return Ok(JobResult {
+                name: ctx.job_name.to_string(),
+                status: if any_failed {
+                    JobStatus::Failure
+                } else {
+                    JobStatus::Success
+                },
+                steps: vec![summary_step],
+                logs,
+            });
         }
     };
 
-    // Parse called workflow
+    // Parse called workflow (for local paths)
     let called = parse_workflow(&workflow_path)?;
 
     // Create child env context
