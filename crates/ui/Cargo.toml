@@ -1,6 +1,6 @@
 [package]
 name = "wrkflw-ui"
-version.workspace = true
+version = "0.7.3"
 edition.workspace = true
 description = "Terminal user interface for wrkflw workflow execution engine"
 license.workspace = true

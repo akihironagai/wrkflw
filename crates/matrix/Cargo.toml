@@ -1,6 +1,6 @@
 [package]
 name = "wrkflw-matrix"
-version.workspace = true
+version = "0.7.3"
 edition.workspace = true
 description = "Matrix job parallelization for wrkflw workflow execution engine"
 license.workspace = true

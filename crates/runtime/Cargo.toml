@@ -1,6 +1,6 @@
 [package]
 name = "wrkflw-runtime"
-version.workspace = true
+version = "0.7.3"
 edition.workspace = true
 description = "Runtime execution environment for wrkflw workflow engine"
 license.workspace = true

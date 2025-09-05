@@ -1,6 +1,6 @@
 [package]
 name = "wrkflw-logging"
-version.workspace = true
+version = "0.7.3"
 edition.workspace = true
 description = "Logging functionality for wrkflw workflow execution engine"
 license.workspace = true
