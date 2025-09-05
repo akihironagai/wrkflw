@@ -1,6 +1,6 @@
 [package]
 name = "wrkflw-parser"
-version.workspace = true
+version = "0.7.3"
 edition.workspace = true
 description = "Workflow parsing functionality for wrkflw execution engine"
 license.workspace = true

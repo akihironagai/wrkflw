@@ -1,6 +1,6 @@
 [package]
 name = "wrkflw-github"
-version.workspace = true
+version = "0.7.3"
 edition.workspace = true
 description = "GitHub API integration for wrkflw workflow execution engine"
 license.workspace = true

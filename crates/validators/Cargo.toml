@@ -1,6 +1,6 @@
 [package]
 name = "wrkflw-validators"
-version.workspace = true
+version = "0.7.3"
 edition.workspace = true
 description = "Workflow validation functionality for wrkflw execution engine"
 license.workspace = true
